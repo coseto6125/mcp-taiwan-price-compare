@@ -27,6 +27,7 @@ class PriceCompareService:
         self,
         query: str,
         max_per_platform: int = 30,
+        coupang_keywords: list[str] | None = None,
     ) -> SearchResult:
         """
         Search across all platforms concurrently.
@@ -34,11 +35,12 @@ class PriceCompareService:
         Args:
             query: Product search keyword
             max_per_platform: Max results per platform
+            coupang_keywords: Required keywords for Coupang results (all must match)
 
         Returns:
             SearchResult with all products
         """
-        coupang_task = self._coupang.search(query, max_per_platform)
+        coupang_task = self._coupang.search(query, max_per_platform, coupang_keywords)
         momo_task = self._momo.search(query, max_per_platform)
         pchome_task = self._pchome.search(query, max_per_platform)
 
@@ -63,6 +65,7 @@ class PriceCompareService:
         min_price: int = 0,
         max_price: int = 0,
         descending: bool = False,
+        coupang_keywords: list[str] | None = None,
     ) -> list[Product]:
         """
         Get top N products sorted by price.
@@ -76,11 +79,12 @@ class PriceCompareService:
             min_price: Minimum price filter (0 = no filter)
             max_price: Maximum price filter (0 = no filter)
             descending: True for high-to-low, False for low-to-high
+            coupang_keywords: Required keywords for Coupang results (all must match)
 
         Returns:
             List of top N products with name, price, url, platform
         """
-        result = await self.search_all_platforms(query, max_per_platform)
+        result = await self.search_all_platforms(query, max_per_platform, coupang_keywords)
 
         # Apply price filters
         products = result.products
@@ -109,13 +113,18 @@ class PriceCompareService:
         """
         return await self._momo.search(query, max_results)
 
-    async def search_coupang(self, query: str, max_results: int = 30) -> list[Product]:
+    async def search_coupang(
+        self,
+        query: str,
+        max_results: int = 30,
+        required_keywords: list[str] | None = None,
+    ) -> list[Product]:
         """
         Search only Coupang Taiwan platform.
 
         MCP Tool: search_coupang
         """
-        return await self._coupang.search(query, max_results)
+        return await self._coupang.search(query, max_results, required_keywords)
 
 
 async def compare_prices(query: str, top_n: int = 10) -> list[dict]:

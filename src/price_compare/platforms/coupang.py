@@ -53,8 +53,20 @@ class CoupangPlatform(BasePlatform):
             )
         return self._client
 
-    async def search(self, query: str, max_results: int = 50) -> list[Product]:
-        """Search products on Coupang using never-primp."""
+    async def search(
+        self,
+        query: str,
+        max_results: int = 50,
+        required_keywords: list[str] | None = None,
+    ) -> list[Product]:
+        """
+        Search products on Coupang using never-primp.
+
+        Args:
+            query: Search query string
+            max_results: Maximum number of results to return
+            required_keywords: Product name must contain ALL these keywords (case-insensitive)
+        """
         client = await self._get_client()
         encoded_query = quote(query)
         url = self._SEARCH_URL.format(encoded_query)
@@ -65,6 +77,9 @@ class CoupangPlatform(BasePlatform):
 
         # Unescape HTML entities
         content = html.unescape(resp.text)
+
+        # Pre-process keywords for case-insensitive matching
+        keywords_lower = [kw.lower() for kw in required_keywords] if required_keywords else None
 
         products: list[Product] = []
         seen_ids: set[str] = set()
@@ -94,6 +109,12 @@ class CoupangPlatform(BasePlatform):
             name = name_match.matched_text.strip()
             if not name:
                 continue
+
+            # Filter by required keywords (all must match)
+            if keywords_lower:
+                name_lower = name.lower()
+                if not all(kw in name_lower for kw in keywords_lower):
+                    continue
 
             # Extract price from price-value class
             price_caps = _PRICE_PATTERN.captures(product_html)

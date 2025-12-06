@@ -1,6 +1,6 @@
 [project]
 name = "mcp-taiwan-price-compare"
-version = "0.1.0"
+version = "0.1.1"
 description = "Price comparison tool for momo and PChome"
 readme = "README.md"
 license = "MIT"

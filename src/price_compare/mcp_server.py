@@ -14,6 +14,7 @@ async def compare_prices(
     top_n: int = 20,
     min_price: int = 0,
     max_price: int = 0,
+    coupang_keywords: list[str] | None = None,
 ) -> list[dict]:
     """
     Search for the cheapest products across Coupang, momo and PChome.
@@ -23,11 +24,15 @@ async def compare_prices(
         top_n: Number of results to return (default: 10)
         min_price: Minimum price filter, use to exclude accessories (default: 0 = no filter)
         max_price: Maximum price filter (default: 0 = no filter)
+        coupang_keywords: Required keywords for Coupang results - product name must contain ALL
+            these keywords (case-insensitive). Use for brand/model filtering. (default: None)
 
     Returns:
         List of products with name, price, url, and platform
     """
-    products = await service.get_cheapest(query, top_n, min_price=min_price, max_price=max_price)
+    products = await service.get_cheapest(
+        query, top_n, min_price=min_price, max_price=max_price, coupang_keywords=coupang_keywords
+    )
     return [p.to_dict() for p in products]
 
 
@@ -64,18 +69,24 @@ async def search_momo(query: str, max_results: int = 20) -> list[dict]:
 
 
 @mcp.tool()
-async def search_coupang(query: str, max_results: int = 20) -> list[dict]:
+async def search_coupang(
+    query: str,
+    max_results: int = 20,
+    required_keywords: list[str] | None = None,
+) -> list[dict]:
     """
     Search products on Coupang Taiwan only.
 
     Args:
         query: Product search keyword
         max_results: Maximum number of results (default: 20)
+        required_keywords: Product name must contain ALL these keywords (case-insensitive).
+            Use for brand/model filtering. (default: None)
 
     Returns:
         List of products sorted by price (low to high)
     """
-    products = await service.search_coupang(query, max_results)
+    products = await service.search_coupang(query, max_results, required_keywords)
     return [p.to_dict() for p in products]
 
 
