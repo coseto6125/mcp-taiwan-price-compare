@@ -12,7 +12,9 @@
 ## 安裝
 
 ```bash
-uv pip install -e .
+pip install mcp-taiwan-price-compare
+# 或
+uv pip install mcp-taiwan-price-compare
 ```
 
 ## MCP Server 配置
@@ -91,7 +93,7 @@ ngrok http 8000
   "mcpServers": {
     "price-compare": {
       "command": "uvx",
-      "args": ["--from", "git+https://github.com/your-repo/price-compare", "price-compare-mcp"]
+      "args": ["--from", "mcp-taiwan-price-compare", "price-compare-mcp"]
     }
   }
 }
