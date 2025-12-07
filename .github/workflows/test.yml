@@ -1,0 +1,76 @@
+name: Test
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+    branches: [master, main]
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          version: "latest"
+
+      - name: Set up Python
+        run: uv python install 3.13
+
+      - name: Install dependencies
+        run: uv sync --dev
+
+      - name: Run linter
+        run: uv run ruff check src/
+
+      - name: Run type checker
+        run: uv run mypy src/price_compare/ --ignore-missing-imports
+
+      - name: Run tests
+        run: uv run pytest tests/ -v --tb=short
+        env:
+          PYTHONUNBUFFERED: "1"
+
+  test-platforms:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: test
+
+    strategy:
+      fail-fast: false
+      matrix:
+        platform:
+          - pchome
+          - momo
+          - coupang
+          - etmall
+          - rakuten
+          - yahoo_shopping
+          - yahoo_auction
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          version: "latest"
+
+      - name: Set up Python
+        run: uv python install 3.13
+
+      - name: Install dependencies
+        run: uv sync --dev
+
+      - name: Test ${{ matrix.platform }}
+        run: |
+          uv run pytest tests/test_platforms.py -v -k "Test${PLATFORM^}" --tb=short
+        env:
+          PLATFORM: ${{ matrix.platform }}
+          PYTHONUNBUFFERED: "1"

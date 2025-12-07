@@ -2,20 +2,13 @@
 
 台灣電商比價工具 MCP Server，支援 momo、PChome、Coupang、ETMall、Rakuten、Yahoo購物中心、Yahoo拍賣 價格搜尋與比較。
 
-**目前版本：v0.2.1** | [更新日誌](#版本歷史)
+**目前版本：v0.3.0** | [更新日誌](#版本歷史)
 
 ## 功能
 
 | 工具 | 說明 |
 |------|------|
 | `compare_prices` | 跨平台搜尋最低價商品 |
-| `search_pchome` | 搜尋 PChome 24h |
-| `search_momo` | 搜尋 momo 購物 |
-| `search_coupang` | 搜尋 Coupang 台灣 |
-| `search_etmall` | 搜尋 ETMall 東森購物 |
-| `search_rakuten` | 搜尋 Rakuten 樂天市場 |
-| `search_yahoo_shopping` | 搜尋 Yahoo 購物中心 |
-| `search_yahoo_auction` | 搜尋 Yahoo 拍賣 |
 
 ### 參數說明
 
@@ -27,33 +20,42 @@
 | `top_n` | int | 20 | 回傳筆數 |
 | `min_price` | int | 0 | 最低價格過濾 (0=不過濾) |
 | `max_price` | int | 0 | 最高價格過濾 (0=不過濾) |
-| `coupang_keywords` | list[str] | None | Coupang 必要關鍵字過濾 (不分大小寫) |
+| `include_keywords` | list[list[str]] | None | 關鍵字分組過濾。組與組是 AND 關係，組內是 OR 關係。例：[["SONY", "索尼"], ["電視", "TV"]] = (SONY OR 索尼) AND (電視 OR TV) |
+| `include_auction` | bool | False | 是否包含 Yahoo 拍賣競標商品 (預設僅含立即購買) |
 
-#### search_coupang
-
-| 參數 | 類型 | 預設值 | 說明 |
-|------|------|--------|------|
-| `query` | str | (必填) | 搜尋關鍵字 |
-| `max_results` | int | 20 | 回傳筆數 |
-| `required_keywords` | list[str] | None | 必要關鍵字過濾，產品名稱須包含所有關鍵字 (不分大小寫) |
+**回傳值**：`str` (TOON 格式) - 壓縮序列化的產品列表，以降低 LLM token 消耗
 
 ### 使用範例
 
 ```python
-# 搜尋 SONY 電視，過濾 Coupang 不相關結果
+# 搜尋 SONY 電視，過濾不相關結果
 compare_prices(
     query="SONY 50吋電視",
-    coupang_keywords=["SONY"]  # Coupang 結果必須包含 "SONY"
+    include_keywords=[["SONY"]]  # 結果必須包含 "SONY"
 )
 
-# 搜尋特定品牌+型號
-search_coupang(
-    query="iPhone 15 Pro",
-    required_keywords=["iPhone", "15", "Pro"]  # 必須同時包含這三個關鍵字
+# 搜尋特定品牌（符合其中一個即可）
+compare_prices(
+    query="無線耳機",
+    include_keywords=[["Apple", "Beats", "Sony"]]  # 品牌過濾
+)
+
+# 複雜過濾：品牌 AND 功能
+compare_prices(
+    query="藍牙喇叭",
+    include_keywords=[["JBL", "BOSE"], ["防水", "IP67"]],  # (JBL OR BOSE) AND (防水 OR IP67)
+    min_price=500,
+    max_price=5000
+)
+
+# 搜尋包含 Yahoo 拍賣競標商品
+compare_prices(
+    query="iPhone 15",
+    include_auction=True
 )
 ```
 
-> **提示**：Coupang 的搜尋結果有時會包含不相關的低價商品，使用 `coupang_keywords` 可有效過濾。
+> **提示**：Coupang 等平台的搜尋結果有時會包含不相關的低價商品，使用 `include_keywords` 可有效過濾。
 
 ## 安裝
 
@@ -178,6 +180,18 @@ uv run python -m price_compare "機械鍵盤" --desc
 - [Desktop Extensions 一鍵安裝](https://www.anthropic.com/engineering/desktop-extensions)
 
 ## 版本歷史
+
+### v0.3.0 (2025-12-08)
+- ✨ **重大重構**：統一 MCP 工具，只保留 `compare_prices` 通用工具
+- 🔄 **參數優化**：
+  - 重命名 `coupang_keywords` → `include_keywords`（支援多平台）
+  - 新增關鍵字分組邏輯（組間 AND、組內 OR）
+  - 新增 `include_auction` 參數支援 Yahoo 拍賣競標商品
+- 🚀 **性能改進**：
+  - 使用 TOON 格式壓縮回應，降低 LLM token 消耗 ~30%
+  - 優化平台架構，改進並發搜尋效率
+- 🧪 **完整測試**：新增 CI/CD pipeline 和全平台測試覆蓋
+- 📦 **依賴更新**：新增 `toon_format` 用於結果序列化
 
 ### v0.2.1 (2025-12-07)
 - ✨ 更新 momo 和 rakuten 平台的 GraphQL 實現

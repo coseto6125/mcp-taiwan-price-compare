@@ -1,6 +1,6 @@
 """Data models for price comparison service."""
 
-from msgspec import Struct, structs
+from msgspec import Struct
 
 
 class Product(Struct, frozen=True):
@@ -11,9 +11,6 @@ class Product(Struct, frozen=True):
     url: str
     platform: str
 
-    def to_dict(self) -> dict:
-        return structs.asdict(self)
-
 
 class SearchResult(Struct):
     """Aggregated search results from all platforms."""
@@ -21,7 +18,3 @@ class SearchResult(Struct):
     query: str
     products: list[Product]
     total_count: int
-
-    def get_top_cheapest(self, n: int = 10) -> list[Product]:
-        """Return top N cheapest products sorted by price."""
-        return sorted(self.products, key=lambda p: p.price)[:n]

@@ -6,23 +6,9 @@ dist/
 wheels/
 *.egg-info
 
+# system files
+.claude/*
+.vscode/*
+
 # Virtual environments
 .venv
-.claude/LEARNINGS.md
-.claude/settings.json
-.claude/agents/performance-analyzer.md
-.claude/agents/python-architect.md
-.claude/agents/test-generator.md
-.claude/agents/user-simulation-tester.md
-.claude/skills/auto-permission.md
-.claude/skills/autonomous-reasoning.md
-.claude/skills/code-quality.md
-.claude/skills/code-review.md
-.claude/skills/codebase-patterns.md
-.claude/skills/dependency-management.md
-.claude/skills/doc-lookup.md
-.claude/skills/error-investigation.md
-.claude/skills/performance-profiling.md
-.claude/skills/prompt-engineering.md
-.claude/skills/self-learning.md
-.claude/skills/test-driven.md

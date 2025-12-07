@@ -3,24 +3,24 @@
 from abc import ABC, abstractmethod
 
 from price_compare.models import Product
+from price_compare.utils import KeywordGroups
 
 
 class BasePlatform(ABC):
     """Abstract base class for e-commerce platforms."""
 
-    __slots__ = ("_client",)
+    __slots__ = ()
 
     name: str = "base"
 
     @abstractmethod
-    async def search(self, query: str, max_results: int = 50) -> list[Product]:
-        """
-        Search products by keyword.
-
-        Args:
-            query: Search keyword
-            max_results: Maximum number of results to return
-
-        Returns:
-            List of Product objects
-        """
+    async def search(
+        self,
+        query: str,
+        max_results: int = 100,
+        min_price: int = 0,
+        max_price: int = 0,
+        include_keywords: KeywordGroups = None,
+        **kwargs: object,
+    ) -> list[Product]:
+        """Search products by keyword."""

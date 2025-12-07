@@ -1,6 +1,7 @@
 """PChome platform implementation."""
 
 import asyncio
+from contextlib import suppress
 from typing import TYPE_CHECKING
 from urllib.parse import quote
 
@@ -12,6 +13,7 @@ if TYPE_CHECKING:
 
 from price_compare.models import Product
 from price_compare.platforms.base import BasePlatform
+from price_compare.utils import KeywordGroups, matches_keywords, prepare_keyword_groups
 
 
 class _PChomeProd(msgspec.Struct):
@@ -40,51 +42,61 @@ class PChomePlatform(BasePlatform):
     _BASE_URL = "https://ecshweb.pchome.com.tw/search/v3.3/all/results"
     _PRODUCT_URL = "https://24h.pchome.com.tw/prod/{}"
 
-    def __init__(
-        self,
-        impersonate: "IMPERSONATE | None" = "chrome_142",
-        timeout: float = 30.0,
-    ) -> None:
+    def __init__(self, impersonate: "IMPERSONATE | None" = "chrome_142", timeout: float = 30.0) -> None:
         self._impersonate = impersonate
         self._timeout = timeout
 
-    async def search(self, query: str, max_results: int = 50) -> list[Product]:
-        """Search products on PChome with concurrent page fetching."""
-        encoded_query = quote(query)
-        per_page = 20
-        # API already sorts by price, so 1-2 pages is enough
-        pages_needed = min((max_results + per_page - 1) // per_page, 2)
+    async def search(
+        self,
+        query: str,
+        max_results: int = 100,
+        min_price: int = 0,
+        max_price: int = 0,
+        include_keywords: KeywordGroups = None,
+        **_: object,
+    ) -> list[Product]:
+        """Search products on PChome."""
+        prepared_keywords = prepare_keyword_groups(include_keywords)
+        pages_needed = min(-(-max_results // 20), 2)
 
         async with primp.AsyncClient(
             impersonate=self._impersonate,
             timeout=self._timeout,
             http2_only=True,
         ) as client:
-            # Build URLs for all pages
-            urls = [f"{self._BASE_URL}?q={encoded_query}&page={p}&sort=prc/ac" for p in range(1, pages_needed + 1)]
+            urls = [f"{self._BASE_URL}?q={quote(query)}&page={p}&sort=prc/ac" for p in range(1, pages_needed + 1)]
+            responses = await asyncio.gather(*[client.get(url) for url in urls], return_exceptions=True)
 
-            # Fetch all pages concurrently
-            tasks = [client.get(url) for url in urls]
-            responses = await asyncio.gather(*tasks, return_exceptions=True)
+            return self._parse_responses(responses, max_results, min_price, max_price, prepared_keywords)
 
-            # Parse all responses
-            products: list[Product] = []
-            for resp in responses:
-                if isinstance(resp, BaseException) or resp.status_code != 200:
-                    continue
+    def _parse_responses(
+        self,
+        responses: list,
+        max_results: int,
+        min_price: int,
+        max_price: int,
+        prepared_keywords: tuple[tuple[str, ...], ...] | None,
+    ) -> list[Product]:
+        """Parse API responses into Product list."""
+        products: list[Product] = []
+
+        for resp in responses:
+            if isinstance(resp, BaseException) or resp.status_code != 200:
+                continue
+
+            with suppress(msgspec.DecodeError):
                 data = _decoder.decode(resp.content)
+
                 for item in data.prods:
                     if len(products) >= max_results:
-                        break
-                    products.append(
-                        Product(
-                            name=item.name,
-                            price=item.price,
-                            url=self._PRODUCT_URL.format(item.Id),
-                            platform=self.name,
-                        )
-                    )
-                if len(products) >= max_results:
-                    break
+                        return products
 
-        return products[:max_results]
+                    # Combined filter
+                    if (min_price and item.price < min_price) or (max_price and item.price > max_price):
+                        continue
+                    if not matches_keywords(item.name.lower(), prepared_keywords):
+                        continue
+
+                    products.append(Product(name=item.name, price=item.price, url=self._PRODUCT_URL.format(item.Id), platform=self.name))
+
+        return products

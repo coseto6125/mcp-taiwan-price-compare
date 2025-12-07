@@ -1,6 +1,6 @@
 [project]
 name = "mcp-taiwan-price-compare"
-version = "0.2.1"
+version = "0.3.0"
 description = "Taiwan e-commerce price comparison MCP server for momo, PChome, Coupang, ETMall, Rakuten, Yahoo"
 readme = "README.md"
 license = "MIT"
@@ -25,6 +25,16 @@ dependencies = [
   "fastmcp>=2.0.0",
   # "playwright>=1.49.0",
   "regex-rs>=0.2.4",
+  "toon_format",
+]
+
+[project.optional-dependencies]
+dev = [
+  "tiktoken>=0.7.0",
+  "pytest>=8.0.0",
+  "pytest-asyncio>=0.24.0",
+  "mypy>=1.0.0",
+  "ruff>=0.8.0",
 ]
 
 [project.urls]
@@ -42,11 +52,14 @@ package = true
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
+[tool.hatch.metadata]
+allow-direct-references = true
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/price_compare"]
 
 [tool.ty.src]
-exclude = [".venv/*"]
+exclude = [".venv/*", "tests/*"]
 
 [tool.ruff]
 target-version = "py313" # 適用於 lint 與 format 的目標 Python 版本
@@ -201,3 +214,9 @@ skip-magic-trailing-comma = false # 是否略過自動加入的逗號
 docstring-code-format = false # docstring 內程式碼是否格式化
 docstring-code-line-length = "dynamic" # docstring 內程式碼行長策略
 preview = false # 是否啟用格式化預覽(開則會在格式化時顯示預覽結果，但不直接套用)
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+testpaths = ["tests"]
+filterwarnings = ["ignore::DeprecationWarning"]

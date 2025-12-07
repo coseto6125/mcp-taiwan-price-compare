@@ -12,8 +12,6 @@ async def test():
             print(f"  - {p.name[:30]}... ${p.price}")
     except Exception as e:
         print(f"錯誤: {e}")
-    finally:
-        await platform.close()
 
 
 asyncio.run(test())
