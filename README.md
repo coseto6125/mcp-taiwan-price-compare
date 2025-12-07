@@ -2,6 +2,8 @@
 
 台灣電商比價工具 MCP Server，支援 momo、PChome、Coupang、ETMall、Rakuten、Yahoo購物中心、Yahoo拍賣 價格搜尋與比較。
 
+**目前版本：v0.2.1** | [更新日誌](#版本歷史)
+
 ## 功能
 
 | 工具 | 說明 |
@@ -174,3 +176,17 @@ uv run python -m price_compare "機械鍵盤" --desc
 - [Model Context Protocol 官方文件](https://modelcontextprotocol.io/docs/develop/connect-local-servers)
 - [Claude Desktop MCP 設定指南](https://support.claude.com/en/articles/10949351-getting-started-with-local-mcp-servers-on-claude-desktop)
 - [Desktop Extensions 一鍵安裝](https://www.anthropic.com/engineering/desktop-extensions)
+
+## 版本歷史
+
+### v0.2.1 (2025-12-07)
+- ✨ 更新 momo 和 rakuten 平台的 GraphQL 實現
+- 📝 新增 yahoo 購物中心規劃文檔
+- 🔧 優化 coupang 平台實現
+
+### v0.2.0
+- 新增多個電商平台支持
+- 初版功能完善
+
+### v0.1.0
+- 項目初始版本
