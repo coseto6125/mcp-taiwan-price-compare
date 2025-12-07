@@ -186,20 +186,21 @@ uv run python -m price_compare "機械鍵盤" --desc
 - 🔄 **工具統一**：合併 `compare_prices` 和 `search_platform` 為單一工具
   - `platform=None`（預設）：搜尋所有 7 平台
   - `platform="momo"` 等：搜尋指定單一平台
+- 📝 **Prompt 強化**：優化 MCP 工具描述，讓 LLM 更容易理解使用方式
 
 ### v0.3.2 (2025-12-08)
 - 🚀 **搜尋優化**：動態調整搜尋量，根據 `require_words` 過濾條件自動增加搜尋範圍
 - 🎯 **結果完整性**：確保過濾品牌/型號時不漏掉最低價商品
-- 🔧 **程式碼優化**：新增 `calc_search_multiplier()` 工具函數，pchome 新增 `_PAGE_SIZE` 常量
+- 📝 **Prompt 強化**：改進工具描述，明確標示 ✅ 正確用法和 ❌ 錯誤用法
 
 ### v0.3.1 (2025-12-08)
 - 🐛 **Bug 修復**：修正 Yahoo 拍賣價格解析問題
 - 📝 **文件更新**：完善 README 和 API 文件
 
 ### v0.3.0 (2025-12-08)
-- ✨ **重大重構**：統一 MCP 工具，只保留 `compare_prices` 通用工具
+- ✨ **重大重構**：大規模架構重構，優化平台搜尋效率
 - 🔄 **參數優化**：
-  - 重命名 `coupang_keywords` → `include_keywords`（支援多平台）
+  - 重命名 `coupang_keywords` → `require_words`（支援多平台）
   - 新增關鍵字分組邏輯（組間 AND、組內 OR）
   - 新增 `include_auction` 參數支援 Yahoo 拍賣競標商品
 - 🚀 **性能改進**：
