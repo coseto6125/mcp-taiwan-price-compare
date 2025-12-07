@@ -1,24 +1,15 @@
-"""momo platform implementation."""
+"""momo platform implementation using textSearch API."""
 
 import asyncio
-from typing import TYPE_CHECKING
-from urllib.parse import quote
+from typing import TYPE_CHECKING, Any
 
 import never_primp as primp
-from regex_rs import Regex
 
 if TYPE_CHECKING:
     from never_primp import IMPERSONATE
 
 from price_compare.models import Product
 from price_compare.platforms.base import BasePlatform
-
-# Regex for escaped JSON format (Next.js SSR data)
-_JSON_PATTERN = Regex(
-    r"(?s)goodsCode\\\":\\\"(\d+)\\\".*?"
-    r"goodsName\\\":\\\"([^\\]+?)\\\".*?"
-    r"SALE_PRICE\\\":\\\"(\d+)\\\""
-)
 
 
 class MomoPlatform(BasePlatform):
@@ -27,8 +18,9 @@ class MomoPlatform(BasePlatform):
     __slots__ = ("_impersonate", "_timeout")
 
     name = "momo"
-    _SEARCH_URL = "https://m.momoshop.com.tw/search.momo"
+    _API_URL = "https://apisearch.momoshop.com.tw/momoSearchCloud/moec/textSearch"
     _PRODUCT_URL = "https://www.momoshop.com.tw/goods/GoodsDetail.jsp?i_code={}"
+    _PAGE_SIZE = 20  # API returns 20 items per page
 
     def __init__(
         self,
@@ -38,41 +30,47 @@ class MomoPlatform(BasePlatform):
         self._impersonate = impersonate
         self._timeout = timeout
 
-    def _parse_price(self, price_str: str) -> int | None:
-        """Parse price string to integer."""
-        try:
-            return int(price_str.replace(",", "").replace("$", ""))
-        except (ValueError, AttributeError):
-            return None
-
-    def _parse_html(self, html: str) -> list[tuple[str, str, int]]:
-        """Parse HTML to extract product data from escaped JSON."""
-        results: list[tuple[str, str, int]] = []
-        seen_ids: set[str] = set()
-
-        for caps in _JSON_PATTERN.captures_iter(html):
-            m1, m2, m3 = caps.get(1), caps.get(2), caps.get(3)
-            if not m1 or not m2 or not m3:
-                continue
-            prod_id = m1.matched_text
-            name = m2.matched_text
-            price_str = m3.matched_text
-            if prod_id in seen_ids:
-                continue
-            price = self._parse_price(price_str)
-            if price is not None:
-                seen_ids.add(prod_id)
-                # Unescape JSON string
-                clean_name = name.replace("\\\\", "\\").replace("\\/", "/")
-                results.append((prod_id, clean_name, price))
-
-        return results
+    def _build_payload(self, query: str, page: int) -> dict[str, Any]:
+        """Build API request payload."""
+        return {
+            "host": "ecmobile",
+            "flag": "searchEngine",
+            "data": {
+                "searchValue": query,
+                "curPage": page,
+                "maxPage": 30,
+                "cateLevel": -1,
+                "serviceCode": "MT01",
+                "platform": 16,
+                "has3P": "Y",
+                # Default filters
+                "NAM": "N",
+                "china": "N",
+                "cp": "N",
+                "first": "N",
+                "freeze": "N",
+                "prefere": "N",
+                "stockYN": "N",
+                "superstore": "N",
+                "threeHours": "N",
+                "tomorrow": "N",
+                "tvshop": "N",
+                "video": "N",
+                "cycle": "N",
+                "cod": "N",
+                "superstorePay": "N",
+                "moCoinFeedback": "N",
+                "superstoreFree": "N",
+                "discount": "N",
+                "isBrandSeriesPage": False,
+                "isShowAdShop": False,
+                "curRecommendedWordsCnt": 0,
+            },
+        }
 
     async def search(self, query: str, max_results: int = 50) -> list[Product]:
-        """Search products on momo with concurrent page fetching."""
-        encoded_query = quote(query)
-        # First page usually has 30+ items, 2 pages max for price comparison
-        pages_needed = min((max_results + 29) // 30, 2)
+        """Search products on momo using textSearch API."""
+        pages_needed = min((max_results + self._PAGE_SIZE - 1) // self._PAGE_SIZE, 3)
 
         async with primp.AsyncClient(
             impersonate=self._impersonate,
@@ -80,18 +78,17 @@ class MomoPlatform(BasePlatform):
             timeout=self._timeout,
             http2_only=True,
             headers={
-                "accept": "text/html,application/xhtml+xml",
-                "accept-language": "zh-TW,zh;q=0.9",
+                "content-type": "application/json",
+                "accept": "application/json, text/plain, */*",
+                "origin": "https://m.momoshop.com.tw",
+                "referer": "https://m.momoshop.com.tw/",
             },
         ) as client:
-            # Build URLs for all pages
-            urls = [
-                f"{self._SEARCH_URL}?searchKeyword={encoded_query}&searchType=1&curPage={p}"
+            # Fetch all pages concurrently
+            tasks = [
+                client.post(self._API_URL, json=self._build_payload(query, p))
                 for p in range(1, pages_needed + 1)
             ]
-
-            # Fetch all pages concurrently
-            tasks = [client.get(url) for url in urls]
             responses = await asyncio.gather(*tasks, return_exceptions=True)
 
             # Parse all responses
@@ -102,15 +99,32 @@ class MomoPlatform(BasePlatform):
                 if isinstance(resp, BaseException) or resp.status_code != 200:
                     continue
 
-                for prod_id, name, price in self._parse_html(resp.text):
-                    if prod_id in seen_ids or len(products) >= max_results:
+                try:
+                    data = resp.json()
+                    if not data.get("success"):
                         continue
-                    seen_ids.add(prod_id)
+                    goods_list = data.get("rtnSearchData", {}).get("goodsInfoList", [])
+                except Exception:
+                    continue
+
+                for item in goods_list:
+                    if len(products) >= max_results:
+                        break
+                    goods_code = item.get("goodsCode")
+                    if not goods_code or goods_code in seen_ids:
+                        continue
+
+                    price = item.get("SALE_PRICE")
+                    name = item.get("goodsName")
+                    if not price or not name:
+                        continue
+
+                    seen_ids.add(goods_code)
                     products.append(
                         Product(
                             name=name,
-                            price=price,
-                            url=self._PRODUCT_URL.format(prod_id),
+                            price=int(price),
+                            url=self._PRODUCT_URL.format(goods_code),
                             platform=self.name,
                         )
                     )

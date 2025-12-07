@@ -29,7 +29,7 @@ class CoupangPlatform(BasePlatform):
 
     name = "coupang"
     _BASE_URL = "https://www.tw.coupang.com"
-    _SEARCH_URL = "https://www.tw.coupang.com/np/search?q={}&sorter=LOWEST_PRICE_ASC"
+    _SEARCH_URL = "https://www.tw.coupang.com/np/search?q={}&sorter=LOWEST_PRICE_ASC&listSize=20"
     _PRODUCT_URL = "https://www.tw.coupang.com/vp/products/{}"
 
     def __init__(
