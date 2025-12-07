@@ -1,10 +1,14 @@
 """momo platform implementation."""
 
 import asyncio
+from typing import TYPE_CHECKING
 from urllib.parse import quote
 
 import never_primp as primp
 from regex_rs import Regex
+
+if TYPE_CHECKING:
+    from never_primp import IMPERSONATE
 
 from price_compare.models import Product
 from price_compare.platforms.base import BasePlatform
@@ -28,7 +32,7 @@ class MomoPlatform(BasePlatform):
 
     def __init__(
         self,
-        impersonate: str | None = "chrome_142",
+        impersonate: "IMPERSONATE | None" = "chrome_142",
         timeout: float = 30.0,
     ) -> None:
         self._impersonate = impersonate

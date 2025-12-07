@@ -1,12 +1,12 @@
 [project]
 name = "mcp-taiwan-price-compare"
-version = "0.1.1"
-description = "Price comparison tool for momo and PChome"
+version = "0.2.0"
+description = "Taiwan e-commerce price comparison MCP server for momo, PChome, Coupang, ETMall, Rakuten, Yahoo"
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.13"
 authors = [{ name = "coseto6125", email = "cosetoenor@gmail.com" }]
-keywords = ["mcp", "price-comparison", "taiwan", "e-commerce", "momo", "pchome", "coupang", "shopee", "ai-agent"]
+keywords = ["mcp", "price-comparison", "taiwan", "e-commerce", "momo", "pchome", "coupang", "etmall", "rakuten", "yahoo", "ai-agent"]
 classifiers = [
   "Development Status :: 3 - Alpha",
   "Intended Audience :: Developers",

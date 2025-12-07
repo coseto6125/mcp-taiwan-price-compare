@@ -1,4 +1,4 @@
-"""MCP server for price comparison across Coupang, momo and PChome."""
+"""MCP server for price comparison across multiple Taiwan e-commerce platforms."""
 
 from fastmcp import FastMCP
 
@@ -17,11 +17,11 @@ async def compare_prices(
     coupang_keywords: list[str] | None = None,
 ) -> list[dict]:
     """
-    Search for the cheapest products across Coupang, momo and PChome.
+    Search for the cheapest products across Coupang, momo, PChome, ETMall, Rakuten, Yahoo購物中心, and Yahoo拍賣.
 
     Args:
         query: Product search keyword (e.g., "iPhone 15", "藍牙耳機")
-        top_n: Number of results to return (default: 10)
+        top_n: Number of results to return (default: 20)
         min_price: Minimum price filter, use to exclude accessories (default: 0 = no filter)
         max_price: Maximum price filter (default: 0 = no filter)
         coupang_keywords: Required keywords for Coupang results - product name must contain ALL
@@ -87,6 +87,76 @@ async def search_coupang(
         List of products sorted by price (low to high)
     """
     products = await service.search_coupang(query, max_results, required_keywords)
+    return [p.to_dict() for p in products]
+
+
+@mcp.tool()
+async def search_etmall(query: str, max_results: int = 20) -> list[dict]:
+    """
+    Search products on ETMall (東森購物) only.
+
+    Args:
+        query: Product search keyword
+        max_results: Maximum number of results (default: 20)
+
+    Returns:
+        List of products sorted by price (low to high)
+    """
+    products = await service.search_etmall(query, max_results)
+    return [p.to_dict() for p in products]
+
+
+@mcp.tool()
+async def search_rakuten(
+    query: str,
+    max_results: int = 20,
+    required_keywords: list[str] | None = None,
+) -> list[dict]:
+    """
+    Search products on Rakuten Taiwan (樂天市場) only.
+
+    Args:
+        query: Product search keyword
+        max_results: Maximum number of results (default: 20)
+        required_keywords: Product name must contain ALL these keywords (case-insensitive).
+            Use for brand/model filtering. (default: None)
+
+    Returns:
+        List of products sorted by price (low to high)
+    """
+    products = await service.search_rakuten(query, max_results, required_keywords)
+    return [p.to_dict() for p in products]
+
+
+@mcp.tool()
+async def search_yahoo_shopping(query: str, max_results: int = 20) -> list[dict]:
+    """
+    Search products on Yahoo Shopping (Yahoo購物中心) only.
+
+    Args:
+        query: Product search keyword
+        max_results: Maximum number of results (default: 20)
+
+    Returns:
+        List of products sorted by price (low to high)
+    """
+    products = await service.search_yahoo_shopping(query, max_results)
+    return [p.to_dict() for p in products]
+
+
+@mcp.tool()
+async def search_yahoo_auction(query: str, max_results: int = 20) -> list[dict]:
+    """
+    Search products on Yahoo Auction (Yahoo拍賣) only.
+
+    Args:
+        query: Product search keyword
+        max_results: Maximum number of results (default: 20)
+
+    Returns:
+        List of products sorted by price (low to high)
+    """
+    products = await service.search_yahoo_auction(query, max_results)
     return [p.to_dict() for p in products]
 
 

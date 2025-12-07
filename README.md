@@ -1,6 +1,6 @@
 # Price Compare MCP
 
-台灣電商比價工具 MCP Server，支援 momo、PChome、Coupang 價格搜尋與比較。
+台灣電商比價工具 MCP Server，支援 momo、PChome、Coupang、ETMall、Rakuten、Yahoo購物中心、Yahoo拍賣 價格搜尋與比較。
 
 ## 功能
 
@@ -10,6 +10,10 @@
 | `search_pchome` | 搜尋 PChome 24h |
 | `search_momo` | 搜尋 momo 購物 |
 | `search_coupang` | 搜尋 Coupang 台灣 |
+| `search_etmall` | 搜尋 ETMall 東森購物 |
+| `search_rakuten` | 搜尋 Rakuten 樂天市場 |
+| `search_yahoo_shopping` | 搜尋 Yahoo 購物中心 |
+| `search_yahoo_auction` | 搜尋 Yahoo 拍賣 |
 
 ### 參數說明
 

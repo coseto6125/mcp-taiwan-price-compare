@@ -1,6 +1,6 @@
 """Data models for price comparison service."""
 
-from msgspec import Struct
+from msgspec import Struct, structs
 
 
 class Product(Struct, frozen=True):
@@ -12,12 +12,7 @@ class Product(Struct, frozen=True):
     platform: str
 
     def to_dict(self) -> dict:
-        return {
-            "name": self.name,
-            "price": self.price,
-            "url": self.url,
-            "platform": self.platform,
-        }
+        return structs.asdict(self)
 
 
 class SearchResult(Struct):
