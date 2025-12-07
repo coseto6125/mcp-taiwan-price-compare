@@ -12,7 +12,7 @@ if TYPE_CHECKING:
 
 from price_compare.models import Product
 from price_compare.platforms.base import BasePlatform
-from price_compare.utils import KeywordGroups, matches_keywords, prepare_keyword_groups
+from price_compare.utils import KeywordGroups, calc_search_multiplier, matches_keywords, prepare_keyword_groups
 
 
 class _ProductData(msgspec.Struct, rename="camel"):
@@ -58,12 +58,13 @@ class ETMallPlatform(BasePlatform):
         max_results: int = 100,
         min_price: int = 0,
         max_price: int = 0,
-        include_keywords: KeywordGroups = None,
+        require_words: KeywordGroups = None,
         **_: object,
     ) -> list[Product]:
         """Search products on ETMall."""
-        url = f"{self._SEARCH_URL}?Keyword={quote(query)}&SortType=4&PageSize={max_results}&PageIndex=0"
-        prepared_keywords = prepare_keyword_groups(include_keywords)
+        adjusted_max = min(max_results * calc_search_multiplier(require_words), 200)
+        url = f"{self._SEARCH_URL}?Keyword={quote(query)}&SortType=4&PageSize={adjusted_max}&PageIndex=0"
+        prepared_keywords = prepare_keyword_groups(require_words)
 
         async with primp.AsyncClient(
             impersonate=self._impersonate,

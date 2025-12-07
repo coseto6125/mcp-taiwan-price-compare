@@ -43,12 +43,12 @@ class CoupangPlatform(BasePlatform):
         max_results: int = 100,
         min_price: int = 0,
         max_price: int = 0,
-        include_keywords: KeywordGroups = None,
+        require_words: KeywordGroups = None,
         **_: object,
     ) -> list[Product]:
         """Search products on Coupang."""
         url = self._SEARCH_URL.format(quote(query))
-        prepared_keywords = prepare_keyword_groups(include_keywords)
+        prepared_keywords = prepare_keyword_groups(require_words)
 
         async with primp.AsyncClient(
             impersonate=self._impersonate,

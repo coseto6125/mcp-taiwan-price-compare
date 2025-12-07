@@ -47,7 +47,7 @@ class RakutenPlatform(BasePlatform):
         max_results: int = 100,
         min_price: int = 0,
         max_price: int = 0,
-        include_keywords: KeywordGroups = None,
+        require_words: KeywordGroups = None,
         **_: object,
     ) -> list[Product]:
         """Search products on Rakuten Taiwan."""
@@ -80,7 +80,7 @@ class RakutenPlatform(BasePlatform):
             if not (items := search_page.get("result", {}).get("items")):
                 return []
 
-            return self._parse_items(items, max_results, min_price, max_price, prepare_keyword_groups(include_keywords))
+            return self._parse_items(items, max_results, min_price, max_price, prepare_keyword_groups(require_words))
 
     def _parse_items(
         self,

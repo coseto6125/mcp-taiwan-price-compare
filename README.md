@@ -2,7 +2,7 @@
 
 台灣電商比價工具 MCP Server，支援 momo、PChome、Coupang、ETMall、Rakuten、Yahoo購物中心、Yahoo拍賣 價格搜尋與比較。
 
-**目前版本：v0.3.0** | [更新日誌](#版本歷史)
+**目前版本：v0.3.2** | [更新日誌](#版本歷史)
 
 ## 功能
 
@@ -180,6 +180,15 @@ uv run python -m price_compare "機械鍵盤" --desc
 - [Desktop Extensions 一鍵安裝](https://www.anthropic.com/engineering/desktop-extensions)
 
 ## 版本歷史
+
+### v0.3.2 (2025-12-08)
+- 🚀 **搜尋優化**：動態調整搜尋量，根據 `require_words` 過濾條件自動增加搜尋範圍
+- 🎯 **結果完整性**：確保過濾品牌/型號時不漏掉最低價商品
+- 🔧 **程式碼優化**：新增 `calc_search_multiplier()` 工具函數，pchome 新增 `_PAGE_SIZE` 常量
+
+### v0.3.1 (2025-12-08)
+- 🐛 **Bug 修復**：修正 Yahoo 拍賣價格解析問題
+- 📝 **文件更新**：完善 README 和 API 文件
 
 ### v0.3.0 (2025-12-08)
 - ✨ **重大重構**：統一 MCP 工具，只保留 `compare_prices` 通用工具

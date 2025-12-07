@@ -12,7 +12,7 @@ if TYPE_CHECKING:
 
 from price_compare.models import Product
 from price_compare.platforms.base import BasePlatform
-from price_compare.utils import KeywordGroups, matches_keywords, prepare_keyword_groups
+from price_compare.utils import KeywordGroups, calc_search_multiplier, matches_keywords, prepare_keyword_groups
 
 # Static payload template (filters that never change)
 _PAYLOAD_TEMPLATE: dict = {
@@ -69,12 +69,13 @@ class MomoPlatform(BasePlatform):
         max_results: int = 100,
         min_price: int = 0,
         max_price: int = 0,
-        include_keywords: KeywordGroups = None,
+        require_words: KeywordGroups = None,
         **_: object,
     ) -> list[Product]:
         """Search products on momo."""
-        prepared_keywords = prepare_keyword_groups(include_keywords)
-        pages_needed = min(-(-max_results // self._PAGE_SIZE), 3)  # Ceiling division
+        prepared_keywords = prepare_keyword_groups(require_words)
+        adjusted_max = max_results * calc_search_multiplier(require_words)
+        pages_needed = min(-(-adjusted_max // self._PAGE_SIZE), 5)  # Ceiling division, max 5 pages
 
         async with primp.AsyncClient(
             impersonate=self._impersonate,

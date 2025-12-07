@@ -89,12 +89,12 @@ class YahooAuctionPlatform(BasePlatform):
         max_results: int = 100,
         min_price: int = 0,
         max_price: int = 0,
-        include_keywords: KeywordGroups = None,
+        require_words: KeywordGroups = None,
         include_auction: bool = False,
         **_: object,
     ) -> list[Product]:
         """Search products on Yahoo Auction."""
-        prepared_keywords = prepare_keyword_groups(include_keywords)
+        prepared_keywords = prepare_keyword_groups(require_words)
         buy_now_only = not include_auction
 
         # Try GraphQL first, fallback to HTML

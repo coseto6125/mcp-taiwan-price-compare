@@ -13,7 +13,7 @@ if TYPE_CHECKING:
 
 from price_compare.models import Product
 from price_compare.platforms.base import BasePlatform
-from price_compare.utils import KeywordGroups, matches_keywords, prepare_keyword_groups
+from price_compare.utils import KeywordGroups, calc_search_multiplier, matches_keywords, prepare_keyword_groups
 
 
 class _PChomeProd(msgspec.Struct):
@@ -41,6 +41,7 @@ class PChomePlatform(BasePlatform):
     name = "pchome"
     _BASE_URL = "https://ecshweb.pchome.com.tw/search/v3.3/all/results"
     _PRODUCT_URL = "https://24h.pchome.com.tw/prod/{}"
+    _PAGE_SIZE = 20
 
     def __init__(self, impersonate: "IMPERSONATE | None" = "chrome_142", timeout: float = 30.0) -> None:
         self._impersonate = impersonate
@@ -52,12 +53,13 @@ class PChomePlatform(BasePlatform):
         max_results: int = 100,
         min_price: int = 0,
         max_price: int = 0,
-        include_keywords: KeywordGroups = None,
+        require_words: KeywordGroups = None,
         **_: object,
     ) -> list[Product]:
         """Search products on PChome."""
-        prepared_keywords = prepare_keyword_groups(include_keywords)
-        pages_needed = min(-(-max_results // 20), 2)
+        prepared_keywords = prepare_keyword_groups(require_words)
+        adjusted_max = max_results * calc_search_multiplier(require_words)
+        pages_needed = min(-(-adjusted_max // self._PAGE_SIZE), 5)  # max 5 pages
 
         async with primp.AsyncClient(
             impersonate=self._impersonate,

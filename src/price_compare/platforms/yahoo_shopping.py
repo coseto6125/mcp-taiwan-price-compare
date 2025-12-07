@@ -88,11 +88,11 @@ class YahooShoppingPlatform(BasePlatform):
         max_results: int = 100,
         min_price: int = 0,
         max_price: int = 0,
-        include_keywords: KeywordGroups = None,
+        require_words: KeywordGroups = None,
         **_: object,
     ) -> list[Product]:
         """Search products on Yahoo Shopping."""
-        prepared_keywords = prepare_keyword_groups(include_keywords)
+        prepared_keywords = prepare_keyword_groups(require_words)
         # Try GraphQL first, fallback to HTML
         return await self._search_graphql(query, max_results, min_price, max_price, prepared_keywords) or await self._search_html(
             query, max_results, min_price, max_price, prepared_keywords

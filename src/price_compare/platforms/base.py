@@ -20,7 +20,7 @@ class BasePlatform(ABC):
         max_results: int = 100,
         min_price: int = 0,
         max_price: int = 0,
-        include_keywords: KeywordGroups = None,
+        require_words: KeywordGroups = None,
         **kwargs: object,
     ) -> list[Product]:
         """Search products by keyword."""

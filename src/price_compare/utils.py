@@ -36,3 +36,12 @@ def matches_keywords(name_lower: str, prepared_groups: tuple[tuple[str, ...], ..
     if not prepared_groups:
         return True
     return all(any(kw in name_lower for kw in group) for group in prepared_groups)
+
+
+def calc_search_multiplier(require_words: KeywordGroups) -> int:
+    """
+    Calculate search volume multiplier based on require_words filter strictness.
+
+    Each AND group roughly halves pass rate, so multiply by 2^n (capped at 4x to avoid 429).
+    """
+    return min(1 << len(require_words), 4) if require_words else 1

@@ -28,20 +28,27 @@ async def compare_prices(
     top_n: int = 20,
     min_price: int = 0,
     max_price: int = 0,
-    include_keywords: list[list[str]] | None = None,
+    require_words: list[list[str]] | None = None,
     include_auction: bool = False,
 ) -> str:
     """
     Search cheapest products across all platforms: Coupang, momo, PChome, ETMall, Rakuten, Yahoo Shopping, Yahoo Auction.
 
     Args:
-        query: Search keyword (e.g., "iPhone 15", "藍牙耳機")
+        query: Complete product description (brand + type + specs).
+            ✅ "SONY 50吋電視", "Apple AirPods Pro"
+            ❌ "電視", "耳機" (too broad, returns accessories)
+
         top_n: Results count (default: 20)
+
         min_price: Min price filter, 0=off (default: 0)
+
         max_price: Max price filter, 0=off (default: 0)
-        include_keywords: Keyword groups filter. Groups are AND, within group is OR.
-            e.g. [["SONY", "索尼"], ["電視", "TV"]] = (SONY OR 索尼) AND (電視 OR TV)
-        include_auction: Include Yahoo auction bids (default: False, buy-now only)
+
+        require_words: Require results to contain specific words. AND between groups, OR within group.
+            Example: [["SONY", "索尼"], ["50"]] → must have (SONY OR 索尼) AND 50
+
+        include_auction: Include Yahoo auction bids (default: False)
 
     Returns:
         TOON format: name, price, url, platform
@@ -51,7 +58,7 @@ async def compare_prices(
         top_n,
         min_price=min_price,
         max_price=max_price,
-        include_keywords=include_keywords,
+        require_words=require_words,
         include_auction=include_auction,
     )
     return _to_toon(products)
@@ -64,19 +71,28 @@ async def search_platform(
     max_results: int = 20,
     min_price: int = 0,
     max_price: int = 0,
-    include_keywords: list[list[str]] | None = None,
+    require_words: list[list[str]] | None = None,
     include_auction: bool = False,
 ) -> str:
     """
-    Search single platform only.
+    Search single platform only. Use this to compare prices across different platforms with the same query.
 
     Args:
-        query: Search keyword
+        query: Complete product description (brand + type + specs).
+            ✅ "SONY 50吋電視", "iPhone 15 Pro Max"
+            ❌ "電視" (too broad, returns accessories)
+
         platform: One of: pchome, momo, coupang, etmall, rakuten, yahoo_shopping, yahoo_auction
+
         max_results: Results count (default: 20)
+
         min_price: Min price filter, 0=off (default: 0)
+
         max_price: Max price filter, 0=off (default: 0)
-        include_keywords: Keyword groups filter (see compare_prices)
+
+        require_words: Require results to contain specific words. AND between groups, OR within group.
+            Example: [["SONY", "索尼"], ["50"]] → must have (SONY OR 索尼) AND 50
+
         include_auction: Yahoo auction only - include bids (default: False)
 
     Returns:
@@ -87,7 +103,7 @@ async def search_platform(
         max_results,
         min_price,
         max_price,
-        include_keywords,
+        require_words,
         include_auction=include_auction,
     )
     return _to_toon(products)

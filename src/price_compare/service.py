@@ -44,11 +44,11 @@ class PriceCompareService:
         max_per_platform: int = 100,
         min_price: int = 0,
         max_price: int = 0,
-        include_keywords: KeywordGroups = None,
+        require_words: KeywordGroups = None,
         include_auction: bool = False,
     ) -> SearchResult:
         """Search across all platforms concurrently."""
-        args = (query, max_per_platform, min_price, max_price, include_keywords)
+        args = (query, max_per_platform, min_price, max_price, require_words)
         results = await asyncio.gather(
             *(p.search(*args, include_auction=include_auction) for p in self.platforms.values()),
             return_exceptions=True,
@@ -60,15 +60,15 @@ class PriceCompareService:
         self,
         query: str,
         top_n: int = 10,
-        max_per_platform: int = 30,
+        max_per_platform: int = 50,
         min_price: int = 0,
         max_price: int = 0,
         descending: bool = False,
-        include_keywords: KeywordGroups = None,
+        require_words: KeywordGroups = None,
         include_auction: bool = False,
     ) -> list[Product]:
         """Get top N products sorted by price. Uses heapq for O(n log k)."""
-        result = await self.search_all_platforms(query, max_per_platform, min_price, max_price, include_keywords, include_auction)
+        result = await self.search_all_platforms(query, max_per_platform, min_price, max_price, require_words, include_auction)
         if descending:
             return heapq.nlargest(top_n, result.products, key=attrgetter("price"))
         return heapq.nsmallest(top_n, result.products, key=attrgetter("price"))
