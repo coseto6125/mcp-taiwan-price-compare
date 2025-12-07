@@ -1,6 +1,6 @@
 [project]
 name = "mcp-taiwan-price-compare"
-version = "0.3.2"
+version = "0.3.3"
 description = "Taiwan e-commerce price comparison MCP server for momo, PChome, Coupang, ETMall, Rakuten, Yahoo"
 readme = "README.md"
 license = "MIT"

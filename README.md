@@ -2,7 +2,7 @@
 
 台灣電商比價工具 MCP Server，支援 momo、PChome、Coupang、ETMall、Rakuten、Yahoo購物中心、Yahoo拍賣 價格搜尋與比較。
 
-**目前版本：v0.3.2** | [更新日誌](#版本歷史)
+**目前版本：v0.3.3** | [更新日誌](#版本歷史)
 
 ## 功能
 
@@ -20,42 +20,43 @@
 | `top_n` | int | 20 | 回傳筆數 |
 | `min_price` | int | 0 | 最低價格過濾 (0=不過濾) |
 | `max_price` | int | 0 | 最高價格過濾 (0=不過濾) |
-| `include_keywords` | list[list[str]] | None | 關鍵字分組過濾。組與組是 AND 關係，組內是 OR 關係。例：[["SONY", "索尼"], ["電視", "TV"]] = (SONY OR 索尼) AND (電視 OR TV) |
+| `require_words` | list[list[str]] | None | 關鍵字分組過濾。組與組是 AND 關係，組內是 OR 關係。例：[["SONY", "索尼"], ["電視", "TV"]] = (SONY OR 索尼) AND (電視 OR TV) |
 | `include_auction` | bool | False | 是否包含 Yahoo 拍賣競標商品 (預設僅含立即購買) |
+| `platform` | str | None | 指定單一平台搜尋。None = 搜尋所有平台。可選：pchome, momo, coupang, etmall, rakuten, yahoo_shopping, yahoo_auction |
 
 **回傳值**：`str` (TOON 格式) - 壓縮序列化的產品列表，以降低 LLM token 消耗
 
 ### 使用範例
 
 ```python
-# 搜尋 SONY 電視，過濾不相關結果
-compare_prices(
-    query="SONY 50吋電視",
-    include_keywords=[["SONY"]]  # 結果必須包含 "SONY"
-)
+# 搜尋所有平台最低價（預設）
+compare_prices(query="SONY 50吋電視")
+
+# 只搜尋 momo 平台
+compare_prices(query="SONY 50吋電視", platform="momo")
+
+# 只搜尋 PChome 平台的 Apple 產品
+compare_prices(query="Apple AirPods Pro", platform="pchome")
 
 # 搜尋特定品牌（符合其中一個即可）
 compare_prices(
     query="無線耳機",
-    include_keywords=[["Apple", "Beats", "Sony"]]  # 品牌過濾
+    require_words=[["Apple", "Beats", "Sony"]]  # 品牌過濾
 )
 
 # 複雜過濾：品牌 AND 功能
 compare_prices(
     query="藍牙喇叭",
-    include_keywords=[["JBL", "BOSE"], ["防水", "IP67"]],  # (JBL OR BOSE) AND (防水 OR IP67)
+    require_words=[["JBL", "BOSE"], ["防水", "IP67"]],  # (JBL OR BOSE) AND (防水 OR IP67)
     min_price=500,
     max_price=5000
 )
 
 # 搜尋包含 Yahoo 拍賣競標商品
-compare_prices(
-    query="iPhone 15",
-    include_auction=True
-)
+compare_prices(query="iPhone 15", include_auction=True)
 ```
 
-> **提示**：Coupang 等平台的搜尋結果有時會包含不相關的低價商品，使用 `include_keywords` 可有效過濾。
+> **提示**：Coupang 等平台的搜尋結果有時會包含不相關的低價商品，使用 `require_words` 可有效過濾。
 
 ## 安裝
 
@@ -180,6 +181,11 @@ uv run python -m price_compare "機械鍵盤" --desc
 - [Desktop Extensions 一鍵安裝](https://www.anthropic.com/engineering/desktop-extensions)
 
 ## 版本歷史
+
+### v0.3.3 (2025-12-08)
+- 🔄 **工具統一**：合併 `compare_prices` 和 `search_platform` 為單一工具
+  - `platform=None`（預設）：搜尋所有 7 平台
+  - `platform="momo"` 等：搜尋指定單一平台
 
 ### v0.3.2 (2025-12-08)
 - 🚀 **搜尋優化**：動態調整搜尋量，根據 `require_words` 過濾條件自動增加搜尋範圍
