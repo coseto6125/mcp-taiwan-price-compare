@@ -133,6 +133,20 @@ ngrok http 8000
 
 詳細說明：[OpenAI MCP 文件](https://developers.openai.com/apps-sdk/deploy/connect-chatgpt/)
 
+### Perplexity AI（Mac 本地）
+
+> 目前 Perplexity 僅支援 **macOS 桌面版**的本地 MCP
+
+1. 開啟 Perplexity Mac App → Settings → Connectors
+2. 首次使用需安裝 Helper：點擊安裝 **PerplexityXPC**
+3. 點擊 **Add Connector** → **Simple** 分頁
+4. 填入設定：
+   - **Server Name**: `price-compare`
+   - **Command**: `uvx --from mcp-taiwan-price-compare price-compare-mcp`
+5. 測試：輸入「幫我搜尋 iPhone 16 最低價」
+
+詳細說明：[Perplexity MCP 文件](https://www.perplexity.ai/help-center/en/articles/11502712-local-and-remote-mcps-for-perplexity)
+
 ### 其他安裝方式
 
 **使用 uvx（無需安裝）：**

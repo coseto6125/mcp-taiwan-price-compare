@@ -3,8 +3,18 @@ name: Test
 on:
   push:
     branches: [master, main]
+    paths:
+      - 'src/**'
+      - 'tests/**'
+      - 'pyproject.toml'
+      - 'uv.lock'
   pull_request:
     branches: [master, main]
+    paths:
+      - 'src/**'
+      - 'tests/**'
+      - 'pyproject.toml'
+      - 'uv.lock'
   workflow_dispatch:
 
 jobs:
@@ -24,7 +34,7 @@ jobs:
         run: uv python install 3.13
 
       - name: Install dependencies
-        run: uv sync --dev
+        run: uv sync --extra dev
 
       - name: Run linter
         run: uv run ruff check src/
@@ -66,7 +76,7 @@ jobs:
         run: uv python install 3.13
 
       - name: Install dependencies
-        run: uv sync --dev
+        run: uv sync --extra dev
 
       - name: Test ${{ matrix.platform }}
         run: |
