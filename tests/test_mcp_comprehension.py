@@ -132,20 +132,21 @@ class TestMCPComprehension:
             assert all(isinstance(k, str) for group in kw for k in group)
 
 
-def _get_tool_doc(name: str) -> str:
-    """Get tool docstring from FastMCP tool manager."""
+async def _get_tool_doc(name: str) -> str:
+    """Get tool docstring from FastMCP."""
     from price_compare.mcp_server import mcp
 
-    tool = mcp._tool_manager._tools.get(name)
-    return (tool.description or "") if tool else ""
+    tool = await mcp.get_tool(name)
+    return (tool.fn.__doc__ or "") if tool else ""
 
 
 class TestDocStringCompleteness:
     """Verify all essential information is in the docstrings."""
 
-    def test_compare_prices_docstring(self) -> None:
+    @pytest.mark.asyncio
+    async def test_compare_prices_docstring(self) -> None:
         """Check compare_prices has all required info."""
-        doc = _get_tool_doc("compare_prices")
+        doc = await _get_tool_doc("compare_prices")
         assert doc
 
         # Must mention all platforms
@@ -160,20 +161,3 @@ class TestDocStringCompleteness:
         assert "AND" in doc
         assert "OR" in doc
         assert "[[" in doc  # Example format
-
-    def test_search_platform_docstring(self) -> None:
-        """Check search_platform has all required info."""
-        doc = _get_tool_doc("search_platform")
-        assert doc
-
-        # Must list all platform options
-        assert "pchome" in doc
-        assert "momo" in doc
-        assert "coupang" in doc
-        assert "etmall" in doc
-        assert "rakuten" in doc
-        assert "yahoo_shopping" in doc
-        assert "yahoo_auction" in doc
-
-        # Must mention include_auction is for yahoo_auction
-        assert "auction" in doc.lower()

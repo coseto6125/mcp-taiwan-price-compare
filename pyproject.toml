@@ -1,6 +1,6 @@
 [project]
 name = "mcp-taiwan-price-compare"
-version = "0.3.3"
+version = "0.4.0"
 description = "Taiwan e-commerce price comparison MCP server for momo, PChome, Coupang, ETMall, Rakuten, Yahoo"
 readme = "README.md"
 license = "MIT"
@@ -25,7 +25,7 @@ dependencies = [
   "fastmcp>=2.0.0",
   # "playwright>=1.49.0",
   "regex-rs>=0.2.4",
-  "toon_format",
+  "etoon",
 ]
 
 [project.optional-dependencies]
@@ -44,6 +44,7 @@ Issues = "https://github.com/coseto6125/mcp-taiwan-price-compare/issues"
 
 [project.scripts]
 price-compare-mcp = "price_compare.mcp_server:main"
+price-compare = "price_compare.__main__:main"
 
 [tool.uv]
 package = true

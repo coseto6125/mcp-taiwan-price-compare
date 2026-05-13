@@ -3,7 +3,6 @@
 import asyncio
 import heapq
 from operator import attrgetter
-from tkinter import _flatten  # noqa:RUF100  # type: ignore[attr-defined]
 from typing import TYPE_CHECKING
 
 from price_compare.models import Product, SearchResult
@@ -16,7 +15,7 @@ from price_compare.platforms import (
     YahooAuctionPlatform,
     YahooShoppingPlatform,
 )
-from price_compare.utils import KeywordGroups
+from price_compare.utils import KeywordGroups, flatten
 
 if TYPE_CHECKING:
     from price_compare.platforms.base import BasePlatform
@@ -53,7 +52,7 @@ class PriceCompareService:
             *(p.search(*args, include_auction=include_auction) for p in self.platforms.values()),
             return_exceptions=True,
         )
-        products = list(_flatten([r for r in results if isinstance(r, list)]))
+        products = list(flatten(r for r in results if isinstance(r, list)))
         return SearchResult(query=query, products=products, total_count=len(products))
 
     async def get_cheapest(

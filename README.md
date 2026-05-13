@@ -2,7 +2,7 @@
 
 台灣電商比價工具 MCP Server，支援 momo、PChome、Coupang、ETMall、Rakuten、Yahoo購物中心、Yahoo拍賣 價格搜尋與比較。
 
-**目前版本：v0.3.3** | [更新日誌](#版本歷史)
+**目前版本：v0.4.0** | [更新日誌](#版本歷史)
 
 ## 功能
 
@@ -148,6 +148,31 @@ ngrok http 8000
 詳細說明：[Perplexity MCP 文件](https://www.perplexity.ai/help-center/en/articles/11502712-local-and-remote-mcps-for-perplexity)
 
 ### 其他安裝方式
+
+## 直接使用 (CLI)
+
+除了作為 MCP Server，你也可以直接在終端機使用此工具進行比價：
+
+```bash
+# 安裝後可直接使用系統指令
+price-compare "Nintendo Switch"
+price-compare "Sony 耳機" --top 5 --min 1000 --max 5000 --desc
+
+# 或透過 uv 執行 (如果你沒有全域安裝)
+uv run price-compare "Nintendo Switch"
+```
+
+### CLI 參數說明
+
+| 參數 | 說明 |
+|------|------|
+| `query` | 搜尋關鍵字 (必填) |
+| `-n`, `--top` | 顯示筆數 (預設: 10) |
+| `--min` | 最低價格過濾 |
+| `--max` | 最高價格過濾 |
+| `--desc` | 價格由高到低排序 (預設為低到高) |
+
+---
 
 **使用 uvx（無需安裝）：**
 
