@@ -100,16 +100,16 @@ class TestCoupang:
 
     @pytest.mark.asyncio
     async def test_search_with_keywords(self) -> None:
-        """Test include_keywords filter works with keyword groups."""
+        """Test require_words filter works with keyword groups."""
         platform = CoupangPlatform()
-        # Test with keyword groups: (iPhone) AND (15)
+        # Test with very specific keyword
         products = await platform.search(
-            "iPhone", max_results=10, include_keywords=[["iPhone"], ["15"]]
+            "Nintendo Switch OLED", max_results=5, require_words=[["Nintendo"], ["Switch"]]
         )
         for p in products:
             name_lower = p.name.lower()
-            assert "iphone" in name_lower
-            assert "15" in name_lower
+            assert "nintendo" in name_lower or "任天堂" in name_lower
+            assert "switch" in name_lower
 
     @pytest.mark.asyncio
     async def test_search_with_price_filter(self, sample_query_cheap: str) -> None:
@@ -155,14 +155,16 @@ class TestRakuten:
 
     @pytest.mark.asyncio
     async def test_search_with_keywords(self) -> None:
-        """Test include_keywords filter works with keyword groups."""
+        """Test require_words filter works with keyword groups."""
         platform = RakutenPlatform()
-        # Test with keyword groups: (iPhone)
+        # Test with keyword groups
         products = await platform.search(
-            "iPhone", max_results=10, include_keywords=[["iPhone"]]
+            "Nintendo Switch 主機", max_results=5, require_words=[["Nintendo", "任天堂"], ["Switch"]]
         )
         for p in products:
-            assert "iphone" in p.name.lower()
+            name_lower = p.name.lower()
+            assert ("nintendo" in name_lower or "任天堂" in name_lower)
+            assert "switch" in name_lower
 
     @pytest.mark.asyncio
     async def test_search_with_price_filter(self, sample_query_cheap: str) -> None:

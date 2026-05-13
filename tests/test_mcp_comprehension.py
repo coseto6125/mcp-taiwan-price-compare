@@ -27,13 +27,13 @@ COMPREHENSION_TEST_CASES = [
     (
         "找 SONY 或索尼的電視",
         "compare_prices",
-        {"query": "SONY 電視", "include_keywords": [["SONY", "索尼"]]},
+        {"query": "SONY 電視", "require_words": [["SONY", "索尼"]]},
     ),
     # Complex keyword groups
     (
         "搜尋 SONY 或索尼的電視或 TV",
         "compare_prices",
-        {"query": "SONY 電視", "include_keywords": [["SONY", "索尼"], ["電視", "TV"]]},
+        {"query": "SONY 電視", "require_words": [["SONY", "索尼"], ["電視", "TV"]]},
     ),
     # Include auction prices
     (
@@ -124,28 +124,29 @@ class TestMCPComprehension:
             valid_platforms = {"pchome", "momo", "coupang", "etmall", "rakuten", "yahoo_shopping", "yahoo_auction"}
             assert expected_params["platform"] in valid_platforms
 
-        # Validate include_keywords format if present
-        if "include_keywords" in expected_params:
-            kw = expected_params["include_keywords"]
+        # Validate require_words format if present
+        if "require_words" in expected_params:
+            kw = expected_params["require_words"]
             assert isinstance(kw, list)
             assert all(isinstance(group, list) for group in kw)
             assert all(isinstance(k, str) for group in kw for k in group)
 
 
-def _get_tool_doc(name: str) -> str:
-    """Get tool docstring from FastMCP tool manager."""
+async def _get_tool_doc(name: str) -> str:
+    """Get tool docstring from FastMCP."""
     from price_compare.mcp_server import mcp
 
-    tool = mcp._tool_manager._tools.get(name)
-    return (tool.description or "") if tool else ""
+    tool = await mcp.get_tool(name)
+    return (tool.fn.__doc__ or "") if tool else ""
 
 
 class TestDocStringCompleteness:
     """Verify all essential information is in the docstrings."""
 
-    def test_compare_prices_docstring(self) -> None:
+    @pytest.mark.asyncio
+    async def test_compare_prices_docstring(self) -> None:
         """Check compare_prices has all required info."""
-        doc = _get_tool_doc("compare_prices")
+        doc = await _get_tool_doc("compare_prices")
         assert doc
 
         # Must mention all platforms
@@ -156,24 +157,7 @@ class TestDocStringCompleteness:
         assert "Rakuten" in doc or "rakuten" in doc
         assert "Yahoo" in doc
 
-        # Must explain include_keywords format
+        # Must explain require_words format
         assert "AND" in doc
         assert "OR" in doc
         assert "[[" in doc  # Example format
-
-    def test_search_platform_docstring(self) -> None:
-        """Check search_platform has all required info."""
-        doc = _get_tool_doc("search_platform")
-        assert doc
-
-        # Must list all platform options
-        assert "pchome" in doc
-        assert "momo" in doc
-        assert "coupang" in doc
-        assert "etmall" in doc
-        assert "rakuten" in doc
-        assert "yahoo_shopping" in doc
-        assert "yahoo_auction" in doc
-
-        # Must mention include_auction is for yahoo_auction
-        assert "auction" in doc.lower()

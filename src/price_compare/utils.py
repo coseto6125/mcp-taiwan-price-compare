@@ -1,8 +1,29 @@
 """Shared utilities for price comparison service."""
 
+import itertools
+from typing import Any, Iterable
+
 # Type alias for keyword groups: [[group1_kw1, group1_kw2], [group2_kw1, group2_kw2]]
 # Logic: (group1_kw1 OR group1_kw2) AND (group2_kw1 OR group2_kw2)
 type KeywordGroups = list[list[str]] | None
+
+
+def flatten(iterable: Iterable[Iterable[Any]]) -> Iterable[Any]:
+    """
+    Flatten an iterable of iterables.
+
+    Args:
+        iterable: An iterable containing other iterables
+
+    Returns:
+        A flat iterable containing all elements
+    """
+    try:
+        from tkinter import _flatten  # noqa: RUF100  # type: ignore[attr-defined]
+
+        return _flatten(list(iterable))
+    except ImportError:
+        return itertools.chain.from_iterable(iterable)
 
 
 def prepare_keyword_groups(groups: KeywordGroups) -> tuple[tuple[str, ...], ...] | None:

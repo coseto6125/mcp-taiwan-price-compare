@@ -93,7 +93,11 @@ class MomoPlatform(BasePlatform):
 
     def _build_payload(self, query: str, page: int) -> dict:
         """Build API request payload."""
-        return {"host": _PAYLOAD_TEMPLATE["host"], "flag": _PAYLOAD_TEMPLATE["flag"], "data": {**_PAYLOAD_TEMPLATE["data"], "searchValue": query, "curPage": page}}
+        return {
+            "host": _PAYLOAD_TEMPLATE["host"],
+            "flag": _PAYLOAD_TEMPLATE["flag"],
+            "data": {**_PAYLOAD_TEMPLATE["data"], "searchValue": query, "curPage": page},
+        }
 
     def _parse_responses(
         self,

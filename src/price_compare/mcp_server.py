@@ -2,9 +2,9 @@
 
 from typing import Literal
 
+from etoon import dumps as toon_encode
 from fastmcp import FastMCP
 from msgspec import structs
-from toon_format import encode as toon_encode
 
 from price_compare.models import Product
 from price_compare.service import PriceCompareService

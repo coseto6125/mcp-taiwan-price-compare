@@ -62,7 +62,11 @@ class RakutenPlatform(BasePlatform):
             impersonate_os="windows",
             timeout=self._timeout,
             http2_only=True,
-            headers={"content-type": "application/json", "origin": "https://www.rakuten.com.tw", "referer": "https://www.rakuten.com.tw/search/"},
+            headers={
+                "content-type": "application/json",
+                "origin": "https://www.rakuten.com.tw",
+                "referer": "https://www.rakuten.com.tw/search/",
+            },
         ) as client:
             resp = await client.post(self._GRAPHQL_URL, json=payload)
             if resp.status_code != 200:
