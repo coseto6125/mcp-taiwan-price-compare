@@ -2,7 +2,7 @@
 
 台灣電商比價工具 MCP Server，支援 momo、PChome、Coupang、ETMall、Rakuten、Yahoo購物中心、Yahoo拍賣、Costco、全聯全電商、萬家福、博客來、露天市集、生活市集、松果購物 共 14 個平台的價格搜尋與比較。
 
-**目前版本：v0.4.0** | [更新日誌](#版本歷史)
+**目前版本：v0.5.0** | [更新日誌](#版本歷史)
 
 ## 功能
 
@@ -223,6 +223,18 @@ uv run python -m price_compare "機械鍵盤" --desc
 - [Desktop Extensions 一鍵安裝](https://www.anthropic.com/engineering/desktop-extensions)
 
 ## 版本歷史
+
+### v0.5.0 (2026-08-01)
+- 🛒 **平台擴充**：7 → 14 個平台，新增 Costco、全聯全電商、萬家福、博客來、露天市集、生活市集、松果購物，各附完整整合測試
+- 🐛 **Coupang 修復**：該站改版為 Next.js 後舊選擇器全數失效、靜默回傳 0 筆。改以 CSS Module 前綴比對，並將已失效的 `sorter=LOWEST_PRICE_ASC` 換成 `salePriceAsc` 恢復低價優先
+- ⚡ **`mode` 參數**：`full`（預設，14 平台，約 2.1 秒）／`fast`（9 個次秒級平台，約 0.5 秒）。指定 `platform` 時不受影響，慢平台一律可查
+- 🔬 **離線解析測試**：新增 `tests/fixtures/` 與 `tests/test_parsers.py`，解析回歸不再需要真實網路才驗得出來（21 個測試、0.02 秒）
+- 🔧 **CI 修復**：移除無 cp313 wheel 的 `regex-rs`（改用 stdlib `re`，實測快 2.4 倍）、修正 mypy 錯誤、平台矩陣補齊至 14 個
+- 🚀 **效能**：pcone 改用持久連線（2.42 → 2.00 秒）、rakuten 修正結果數上限（原本寫死只回 60 筆）、service 層加上單平台 3 秒上限
+
+### v0.4.0 (2026-05-13)
+- 📦 **CLI 全域指令**：新增 `price-compare` 與 `price-compare-mcp` 進入點
+- ⬆️ **依賴升級**
 
 ### v0.3.3 (2025-12-08)
 - 🔄 **工具統一**：合併 `compare_prices` 和 `search_platform` 為單一工具
