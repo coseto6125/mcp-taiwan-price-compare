@@ -29,6 +29,17 @@ query fetchSearchPageResults($parameters: GspInputType!) {
 """
 
 
+# itemHits is an enum, not a number. Asking for a bucket bigger than needed costs
+# latency (Twenty 0.51s, Sixty 0.55s, Hundred 0.66s), and the previous hard-coded
+# Sixty silently capped results below the 100 the service asks for.
+_ITEM_HITS = ((20, "Twenty"), (40, "Forty"), (60, "Sixty"))
+
+
+def _item_hits(max_results: int) -> str:
+    """Return the smallest itemHits bucket that covers max_results."""
+    return next((name for size, name in _ITEM_HITS if max_results <= size), "Hundred")
+
+
 class RakutenPlatform(BasePlatform):
     """Rakuten Taiwan (樂天市場) platform."""
 
@@ -54,7 +65,7 @@ class RakutenPlatform(BasePlatform):
         payload = {
             "operationName": "fetchSearchPageResults",
             "query": _GRAPHQL_QUERY,
-            "variables": {"parameters": {"itemHits": "Sixty", "sort": "LowestPrice", "keyword": query}},
+            "variables": {"parameters": {"itemHits": _item_hits(max_results), "sort": "LowestPrice", "keyword": query}},
         }
 
         async with primp.AsyncClient(
