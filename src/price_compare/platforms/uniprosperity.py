@@ -66,7 +66,7 @@ class UniProsperityPlatform(BasePlatform):
             if resp.status_code != 200:
                 return []
 
-            return self._parse_products(html.unescape(resp.text), max_results, min_price, max_price, prepared_keywords)
+            return self._parse_products(resp.text, max_results, min_price, max_price, prepared_keywords)
 
     def _parse_products(
         self,
@@ -87,7 +87,9 @@ class UniProsperityPlatform(BasePlatform):
                 continue
             if _UNAVAILABLE in attrs:
                 continue
-            if not (name_match := _NAME_PATTERN.search(attrs)) or not (name := name_match[1].strip()):
+            # Unescape the captured value, never the page: a name holding &quot; would
+            # otherwise become a bare quote and close the attribute match early, truncating it.
+            if not (name_match := _NAME_PATTERN.search(attrs)) or not (name := html.unescape(name_match[1]).strip()):
                 continue
             if not matches_keywords(name.lower(), prepared_keywords):
                 continue
@@ -102,7 +104,7 @@ class UniProsperityPlatform(BasePlatform):
 
                 seen_ids.add(product_id)
                 products.append(
-                    Product(name=name, price=price, url=f"{self._SITE_URL}{href_match[1]}", platform=self.name)
+                    Product(name=name, price=price, url=f"{self._SITE_URL}{html.unescape(href_match[1])}", platform=self.name)
                 )
 
         # The endpoint returns the whole result set and offers no price sort of its own,

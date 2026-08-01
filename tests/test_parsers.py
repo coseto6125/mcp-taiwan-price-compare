@@ -10,7 +10,6 @@ Next.js, and no test caught it. Regenerate a fixture with tests/fixtures/README.
 site's markup changes on purpose - a diff there is the record of what changed.
 """
 
-import html
 import pathlib
 
 import pytest
@@ -32,11 +31,18 @@ PARSER_IDS = [cls.name for cls, _, _ in PARSERS]
 # Most tests derive their expectations from the fixture itself and only need the pair.
 FIXTURES_ONLY = [(cls, fixture) for cls, fixture, _ in PARSERS]
 CLASSES_ONLY = [cls for cls, _, _ in PARSERS]
+# Same pages with one product's name rewritten to hold an escaped quote.
+ESCAPED_QUOTE_FIXTURES = {"uniprosperity": "uniprosperity_escaped_quote.html", "books": "books_escaped_quote.html", "coupang": "coupang_escaped_quote.html"}
 
 
 def parse(platform_cls, fixture: str, **kwargs) -> list[Product]:
-    """Run a platform's parser over a saved response."""
-    content = html.unescape((FIXTURES / fixture).read_text(encoding="utf-8"))
+    """
+    Run a platform's parser over a saved response.
+
+    The fixture is handed over exactly as the site sent it. Parsers unescape the values
+    they capture, not the page, so pre-unescaping here would hide that.
+    """
+    content = (FIXTURES / fixture).read_text(encoding="utf-8")
     defaults = {"max_results": 100, "min_price": 0, "max_price": 0, "prepared_keywords": None}
     return platform_cls()._parse_products(content, **(defaults | kwargs))
 
@@ -103,3 +109,16 @@ def test_parser_honours_max_results(platform_cls, fixture: str) -> None:
 def test_parser_returns_empty_for_unrecognised_markup(platform_cls) -> None:
     """Test a page whose markup no longer matches yields nothing instead of raising."""
     assert platform_cls()._parse_products("<html><body>404</body></html>", 100, 0, 0, None) == []
+
+
+@pytest.mark.parametrize("platform_cls", CLASSES_ONLY, ids=PARSER_IDS)
+def test_parser_keeps_names_containing_an_escaped_quote(platform_cls) -> None:
+    """Test a name holding &quot; survives instead of being cut at the embedded quote.
+
+    Unescaping the whole page before matching a quote-delimited attribute turns &quot;
+    into a bare quote that closes the match early, so `SONY 27&quot;LCD` parses as `SONY 27`.
+    """
+    products = parse(platform_cls, ESCAPED_QUOTE_FIXTURES[platform_cls.name])
+    assert products
+    assert any('"' in p.name for p in products), "no product carried the embedded quote"
+    assert all("顯示器" in p.name for p in products if '"' in p.name)

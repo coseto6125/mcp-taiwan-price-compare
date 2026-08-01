@@ -61,7 +61,7 @@ class CoupangPlatform(BasePlatform):
             if resp.status_code != 200:
                 return []
 
-            return self._parse_products(html.unescape(resp.text), max_results, min_price, max_price, prepared_keywords)
+            return self._parse_products(resp.text, max_results, min_price, max_price, prepared_keywords)
 
     def _parse_products(
         self,
@@ -83,7 +83,9 @@ class CoupangPlatform(BasePlatform):
 
             if not (id_match := _ID_PATTERN.search(block)) or (vendor_item_id := id_match[1]) in seen_ids:
                 continue
-            if not (name_match := _NAME_PATTERN.search(block)) or not (name := name_match[1].strip()):
+            # Unescape the captured value, never the page: the href holds &amp; separators
+            # and a name may hold &quot;, both of which corrupt matching if resolved first.
+            if not (name_match := _NAME_PATTERN.search(block)) or not (name := html.unescape(name_match[1]).strip()):
                 continue
             if not matches_keywords(name.lower(), prepared_keywords):
                 continue
@@ -106,7 +108,7 @@ class CoupangPlatform(BasePlatform):
                     Product(
                         name=name,
                         price=price,
-                        url=self._PRODUCT_URL.format(link_match[1], link_match[2], vendor_item_id),
+                        url=self._PRODUCT_URL.format(html.unescape(link_match[1]), link_match[2], vendor_item_id),
                         platform=self.name,
                     )
                 )

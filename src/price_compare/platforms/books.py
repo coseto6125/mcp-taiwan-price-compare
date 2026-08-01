@@ -66,7 +66,7 @@ class BooksPlatform(BasePlatform):
                     return []
 
                 return self._parse_products(
-                    html.unescape(resp.text), max_results, min_price, max_price, prepared_keywords
+                    resp.text, max_results, min_price, max_price, prepared_keywords
                 )
         return []
 
@@ -88,7 +88,9 @@ class BooksPlatform(BasePlatform):
 
             if not (id_match := _ID_PATTERN.match(block)) or (product_id := id_match[1]) in seen_ids:
                 continue
-            if not (name_match := _NAME_PATTERN.search(block)) or not (name := name_match[1].strip()):
+            # Unescape the captured value, never the page: a title holding &quot; would
+            # otherwise become a bare quote and close the attribute match early, truncating it.
+            if not (name_match := _NAME_PATTERN.search(block)) or not (name := html.unescape(name_match[1]).strip()):
                 continue
             if not matches_keywords(name.lower(), prepared_keywords):
                 continue

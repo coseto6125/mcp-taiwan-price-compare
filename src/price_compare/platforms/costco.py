@@ -95,7 +95,13 @@ class CostcoPlatform(BasePlatform):
             if not (price_obj := item.get("price")) or (price_value := price_obj.get("value")) is None:
                 continue
 
-            price = int(price_value)
+            # price_value comes off an untyped dict, so a non-numeric entry would raise
+            # here rather than skip the product the way every other guard in this loop does.
+            try:
+                price = int(price_value)
+            except (TypeError, ValueError):
+                continue
+
             if price <= 0 or (min_price and price < min_price) or (max_price and price > max_price):
                 continue
             if not matches_keywords(name.lower(), prepared_keywords):
