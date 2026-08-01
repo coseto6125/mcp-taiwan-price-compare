@@ -1,4 +1,4 @@
-"""Coupang platform implementation."""
+"""博客來 (books.com.tw) platform implementation."""
 
 import html
 import re
@@ -15,24 +15,25 @@ from price_compare.models import Product
 from price_compare.platforms.base import BasePlatform
 from price_compare.utils import KeywordGroups, matches_keywords, prepare_keyword_groups
 
-# Search results are server-rendered CSS modules: class names keep a stable prefix
-# and a build-specific hash suffix, so every pattern matches on the prefix only.
-_PRODUCT_DELIMITER = '<li class="ProductUnit_productUnit__'
-_ID_PATTERN = re.compile(r'data-id="(\d+)"')
-_LINK_PATTERN = re.compile(r'href="(/products/[^"?]+)\?[^"]*itemId=(\d+)')
-_NAME_PATTERN = re.compile(r'<div class="ProductUnit_productNameV2__[^"]*">([^<]+)</div>')
-# Sale price sits in a <span translate="no">; the struck-through list price is a bare <del>.
-_PRICE_PATTERN = re.compile(r'<span translate="no">\$([\d,]+)</span>')
+# Search results are server-rendered; each result lives in one grid cell, distinct
+# from the "floated-btn-wrap" recommendation footer that reuses the same item ids.
+_PRODUCT_DELIMITER = '<div class="table-td" id="prod-itemlist-'
+_ID_PATTERN = re.compile(r'^([^"]+)"')
+_NAME_PATTERN = re.compile(r'title="([^"]+)"')
+# 優惠價 may carry a discount-percent <b> before the actual price; the percent tag
+# is never immediately followed by "元", so the non-greedy match skips past it.
+_PRICE_PATTERN = re.compile(r"優惠價:.*?<b>([\d,]+)</b>\s*元")
 
 
-class CoupangPlatform(BasePlatform):
-    """Coupang Taiwan shopping platform."""
+class BooksPlatform(BasePlatform):
+    """博客來 (books.com.tw) online bookstore."""
 
     __slots__ = ("_impersonate", "_timeout")
 
-    name = "coupang"
-    _SEARCH_URL = "https://www.tw.coupang.com/np/search?q={}&sorter=salePriceAsc&listSize=60"
-    _PRODUCT_URL = "https://www.tw.coupang.com{}?itemId={}&vendorItemId={}"
+    name = "books"
+    # sort/8 sorts by price ascending (verified empirically against relevance order).
+    _SEARCH_URL = "https://search.books.com.tw/search/query/cat/all/sort/8/key/{}"
+    _PRODUCT_URL = "https://www.books.com.tw/products/{}"
 
     def __init__(self, impersonate: "IMPERSONATE | None" = "chrome_142", timeout: float = 30.0) -> None:
         self._impersonate = impersonate
@@ -47,7 +48,7 @@ class CoupangPlatform(BasePlatform):
         require_words: KeywordGroups = None,
         **_: object,
     ) -> list[Product]:
-        """Search products on Coupang."""
+        """Search products on 博客來."""
         url = self._SEARCH_URL.format(quote(query))
         prepared_keywords = prepare_keyword_groups(require_words)
 
@@ -57,11 +58,17 @@ class CoupangPlatform(BasePlatform):
             timeout=self._timeout,
             follow_redirects=True,
         ) as client:
-            resp = await client.get(url)
-            if resp.status_code != 200:
-                return []
+            # 博客來 resets connections outright when it throttles a client, so the
+            # transport error has to be absorbed the same way a non-200 would be.
+            with suppress(Exception):
+                resp = await client.get(url)
+                if resp.status_code != 200:
+                    return []
 
-            return self._parse_products(html.unescape(resp.text), max_results, min_price, max_price, prepared_keywords)
+                return self._parse_products(
+                    html.unescape(resp.text), max_results, min_price, max_price, prepared_keywords
+                )
+        return []
 
     def _parse_products(
         self,
@@ -75,13 +82,11 @@ class CoupangPlatform(BasePlatform):
         products: list[Product] = []
         seen_ids: set[str] = set()
 
-        # Each product is one <li>; splitting on its opening tag avoids the nested
-        # <li> elements (rating, badges) that a non-greedy </li> match would trip on.
         for block in content.split(_PRODUCT_DELIMITER)[1:]:
             if len(products) >= max_results:
                 break
 
-            if not (id_match := _ID_PATTERN.search(block)) or (vendor_item_id := id_match[1]) in seen_ids:
+            if not (id_match := _ID_PATTERN.match(block)) or (product_id := id_match[1]) in seen_ids:
                 continue
             if not (name_match := _NAME_PATTERN.search(block)) or not (name := name_match[1].strip()):
                 continue
@@ -90,23 +95,17 @@ class CoupangPlatform(BasePlatform):
             if not (price_match := _PRICE_PATTERN.search(block)):
                 continue
 
-            # Product path and itemId live in the same href
-            if not (link_match := _LINK_PATTERN.search(block)):
-                continue
-
             with suppress(ValueError):
                 price = int(price_match[1].replace(",", ""))
-
-                # Combined price filter
                 if price <= 0 or (min_price and price < min_price) or (max_price and price > max_price):
                     continue
 
-                seen_ids.add(vendor_item_id)
+                seen_ids.add(product_id)
                 products.append(
                     Product(
                         name=name,
                         price=price,
-                        url=self._PRODUCT_URL.format(link_match[1], link_match[2], vendor_item_id),
+                        url=self._PRODUCT_URL.format(product_id),
                         platform=self.name,
                     )
                 )

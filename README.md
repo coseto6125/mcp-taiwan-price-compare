@@ -1,6 +1,6 @@
 # Price Compare MCP
 
-台灣電商比價工具 MCP Server，支援 momo、PChome、Coupang、ETMall、Rakuten、Yahoo購物中心、Yahoo拍賣 價格搜尋與比較。
+台灣電商比價工具 MCP Server，支援 momo、PChome、Coupang、ETMall、Rakuten、Yahoo購物中心、Yahoo拍賣、Costco、全聯全電商、萬家福、博客來、露天市集、生活市集、松果購物 共 14 個平台的價格搜尋與比較。
 
 **目前版本：v0.4.0** | [更新日誌](#版本歷史)
 
@@ -22,7 +22,7 @@
 | `max_price` | int | 0 | 最高價格過濾 (0=不過濾) |
 | `require_words` | list[list[str]] | None | 關鍵字分組過濾。組與組是 AND 關係，組內是 OR 關係。例：[["SONY", "索尼"], ["電視", "TV"]] = (SONY OR 索尼) AND (電視 OR TV) |
 | `include_auction` | bool | False | 是否包含 Yahoo 拍賣競標商品 (預設僅含立即購買) |
-| `platform` | str | None | 指定單一平台搜尋。None = 搜尋所有平台。可選：pchome, momo, coupang, etmall, rakuten, yahoo_shopping, yahoo_auction |
+| `platform` | str | None | 指定單一平台搜尋。None = 搜尋所有平台。可選：pchome, momo, coupang, etmall, rakuten, yahoo_shopping, yahoo_auction, costco, pxbox, uniprosperity, books, ruten, buy123, pcone |
 
 **回傳值**：`str` (TOON 格式) - 壓縮序列化的產品列表，以降低 LLM token 消耗
 
@@ -223,7 +223,7 @@ uv run python -m price_compare "機械鍵盤" --desc
 
 ### v0.3.3 (2025-12-08)
 - 🔄 **工具統一**：合併 `compare_prices` 和 `search_platform` 為單一工具
-  - `platform=None`（預設）：搜尋所有 7 平台
+  - `platform=None`（預設）：搜尋所有 14 平台
   - `platform="momo"` 等：搜尋指定單一平台
 - 📝 **Prompt 強化**：優化 MCP 工具描述，讓 LLM 更容易理解使用方式
 

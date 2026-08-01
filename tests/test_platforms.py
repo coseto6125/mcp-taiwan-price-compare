@@ -1,4 +1,5 @@
-"""Integration tests for all platforms.
+"""
+Integration tests for all platforms.
 
 These tests make real API calls to verify each platform is working.
 Run with: pytest tests/test_platforms.py -v
@@ -93,10 +94,10 @@ class TestCoupang:
         """Test basic search returns results."""
         platform = CoupangPlatform()
         products = await platform.search(sample_query, max_results=5)
-        # Coupang may not always have results for all queries
-        if products:
-            assert all(p.platform == "coupang" for p in products)
-            assert all(p.price > 0 for p in products)
+        assert len(products) > 0
+        assert all(p.platform == "coupang" for p in products)
+        assert all(p.price > 0 for p in products)
+        assert all(p.url.startswith("https://www.tw.coupang.com/products/") for p in products)
 
     @pytest.mark.asyncio
     async def test_search_with_keywords(self) -> None:
@@ -217,6 +218,14 @@ class TestYahooAuction:
         products = await platform.search(sample_query, max_results=20, include_auction=True)
         if products:
             assert all(p.platform == "yahoo_auction" for p in products)
+
+    @pytest.mark.asyncio
+    async def test_search_returns_absolute_urls(self, sample_query: str) -> None:
+        """Test site-relative hit URLs are expanded to absolute ones."""
+        platform = YahooAuctionPlatform()
+        products = await platform.search(sample_query, max_results=60, include_auction=True)
+        assert len(products) > 0
+        assert all(p.url.startswith("https://") for p in products)
 
     @pytest.mark.asyncio
     async def test_search_with_price_filter(self, sample_query: str) -> None:

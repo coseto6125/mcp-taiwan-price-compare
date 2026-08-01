@@ -73,6 +73,7 @@ class YahooAuctionPlatform(BasePlatform):
 
     name = "yahoo_auction"
     _GRAPHQL_URL = "https://graphql.ec.yahoo.com/graphql"
+    _SITE_URL = "https://tw.bid.yahoo.com"
     _HTML_URL = "https://tw.bid.yahoo.com/search/auction/product"
 
     def __init__(
@@ -219,6 +220,8 @@ class YahooAuctionPlatform(BasePlatform):
                 continue
 
             seen_ids.add(item.ec_productid)
-            products.append(Product(name=item.ec_title, price=int(price), url=item.ec_item_url, platform=self.name))
+            # Some hits carry a site-relative path instead of an absolute URL
+            url = item.ec_item_url if item.ec_item_url.startswith("http") else f"{self._SITE_URL}{item.ec_item_url}"
+            products.append(Product(name=item.ec_title, price=int(price), url=url, platform=self.name))
 
         return products

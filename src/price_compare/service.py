@@ -7,11 +7,18 @@ from typing import TYPE_CHECKING
 
 from price_compare.models import Product, SearchResult
 from price_compare.platforms import (
+    BooksPlatform,
+    Buy123Platform,
+    CostcoPlatform,
     CoupangPlatform,
     ETMallPlatform,
     MomoPlatform,
     PChomePlatform,
+    PconePlatform,
+    PxboxPlatform,
     RakutenPlatform,
+    RutenPlatform,
+    UniProsperityPlatform,
     YahooAuctionPlatform,
     YahooShoppingPlatform,
 )
@@ -26,13 +33,25 @@ class PriceCompareService:
 
     __slots__ = ("platforms",)
 
+    # A concurrent search costs as much wall-clock as its slowest member, so a site
+    # that stalls or refuses connections would otherwise set the latency for all of
+    # them. Healthy platforms answer well inside this; a stalled one is simply dropped.
+    PLATFORM_TIMEOUT = 3.0
+
     def __init__(self) -> None:
         self.platforms: dict[str, BasePlatform] = {
+            "books": BooksPlatform(),
+            "buy123": Buy123Platform(),
+            "costco": CostcoPlatform(),
             "coupang": CoupangPlatform(),
             "etmall": ETMallPlatform(),
             "momo": MomoPlatform(),
             "pchome": PChomePlatform(),
+            "pcone": PconePlatform(),
+            "pxbox": PxboxPlatform(),
             "rakuten": RakutenPlatform(),
+            "ruten": RutenPlatform(),
+            "uniprosperity": UniProsperityPlatform(),
             "yahoo_auction": YahooAuctionPlatform(),
             "yahoo_shopping": YahooShoppingPlatform(),
         }
@@ -49,7 +68,10 @@ class PriceCompareService:
         """Search across all platforms concurrently."""
         args = (query, max_per_platform, min_price, max_price, require_words)
         results = await asyncio.gather(
-            *(p.search(*args, include_auction=include_auction) for p in self.platforms.values()),
+            *(
+                asyncio.wait_for(p.search(*args, include_auction=include_auction), self.PLATFORM_TIMEOUT)
+                for p in self.platforms.values()
+            ),
             return_exceptions=True,
         )
         products = list(flatten(r for r in results if isinstance(r, list)))

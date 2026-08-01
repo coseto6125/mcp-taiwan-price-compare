@@ -732,7 +732,6 @@ dependencies = [
     { name = "msgspec" },
     { name = "never-jscore" },
     { name = "never-primp" },
-    { name = "regex-rs" },
 ]
 
 [package.optional-dependencies]
@@ -754,7 +753,6 @@ requires-dist = [
     { name = "never-primp", specifier = ">=2.1.0" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0.0" },
     { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=0.24.0" },
-    { name = "regex-rs", specifier = ">=0.2.4" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.8.0" },
     { name = "tiktoken", marker = "extra == 'dev'", specifier = ">=0.7.0" },
 ]
@@ -1333,12 +1331,6 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/92/73/93d42045302636c91f2e5ef588b65b84b01428f28ec77de256b1dfdfbe5c/regex-2026.5.9-cp314-cp314t-win_amd64.whl", hash = "sha256:ca518ed29c46eecba6010b15f1b9a479314d2de409536e71b6a13aa04e3b8a77", size = 285685, upload-time = "2026-05-09T23:15:15.086Z" },
     { url = "https://files.pythonhosted.org/packages/da/80/35b4c33c804a165a7f55289afda3ea9e3eb6d15800341a2d66455c0f1f30/regex-2026.5.9-cp314-cp314t-win_arm64.whl", hash = "sha256:5e41809d2683fcde7d5a8c87a6567ba1fb1ce0de9f31bff578de00a4b2d76daa", size = 275713, upload-time = "2026-05-09T23:15:16.98Z" },
 ]
-
-[[package]]
-name = "regex-rs"
-version = "0.2.4"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/2e/56/8e8ffd1431d12684dfa3fe75cc0d51e3ff8d8a2f65d36fa4f188aa86beb7/regex_rs-0.2.4.tar.gz", hash = "sha256:161df936ac4bdbde6ef1fa8f26b7b58273ea722b5fb7dc1b876fd886d8df2ecd", size = 8539, upload-time = "2023-07-08T22:01:10.295Z" }
 
 [[package]]
 name = "requests"

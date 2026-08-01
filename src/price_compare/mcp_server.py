@@ -19,7 +19,9 @@ mcp = FastMCP(name="price-compare")
 service = PriceCompareService()
 
 # Valid platform names
-PlatformName = Literal["pchome", "momo", "coupang", "etmall", "rakuten", "yahoo_shopping", "yahoo_auction"]
+PlatformName = Literal[
+    "pchome", "momo", "coupang", "etmall", "rakuten", "yahoo_shopping", "yahoo_auction", "costco", "pxbox", "uniprosperity", "books", "ruten", "buy123", "pcone"
+]
 
 
 @mcp.tool()
@@ -35,7 +37,7 @@ async def compare_prices(
     """
     Search cheapest products across all platforms (or single platform if specified).
 
-    Platforms: Coupang, momo, PChome, ETMall, Rakuten, Yahoo Shopping, Yahoo Auction
+    Platforms: Coupang, momo, PChome, ETMall, Rakuten, Yahoo Shopping, Yahoo Auction, Costco, 全聯全電商, 萬家福, 博客來, 露天市集, 生活市集, 松果購物
 
     Args:
         query: Complete product description (brand + type + specs).
@@ -53,7 +55,7 @@ async def compare_prices(
 
         include_auction: Include Yahoo auction bids (default: False)
 
-        platform: Search single platform only. Options: pchome, momo, coupang, etmall, rakuten, yahoo_shopping, yahoo_auction
+        platform: Search single platform only. Options: pchome, momo, coupang, etmall, rakuten, yahoo_shopping, yahoo_auction, costco, pxbox, uniprosperity, books, ruten, buy123, pcone
             None = search ALL platforms (default)
 
     Returns:
