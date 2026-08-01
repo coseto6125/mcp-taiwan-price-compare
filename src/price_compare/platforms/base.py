@@ -1,5 +1,6 @@
 """Base platform interface."""
 
+import asyncio
 import heapq
 from abc import ABC, abstractmethod
 from collections.abc import Iterable
@@ -53,6 +54,10 @@ class BasePlatform[Payload](ABC):
     # it: asking Rakuten for 20 and then applying a keyword filter returned 2 products
     # where a full pool yields 20. Adapters that page fetch enough pages to cover this.
     POOL_SIZE = 100
+
+    # Paged adapters retry individual pages rather than discarding the whole set.
+    PAGE_ATTEMPTS = 3
+    PAGE_RETRY_DELAY = 0.3
 
     async def search(
         self,
@@ -132,21 +137,36 @@ class BasePlatform[Payload](ABC):
         # the moment its ranking changed. Sorting ~100 items costs microseconds.
         return heapq.nsmallest(max_results, cheapest.values(), key=attrgetter("price"))
 
-    @staticmethod
-    def _page_bodies(responses: Iterable[object]) -> list[bytes] | None:
+    async def _fetch_pages(self, client: object, urls: list[str]) -> list[bytes] | None:
         """
-        Return every page's body, or None if any page did not arrive.
+        Fetch every page concurrently, retrying the ones that fail.
 
-        A concurrent page fetch that quietly drops its failures looks like a complete
-        result set with a hole in it. When the missing page is the first one, what
-        comes back is not even the site's cheapest set.
+        A page fetch that quietly drops its failures looks like a complete result set
+        with a hole in it, and when the missing page is the first one what comes back
+        is not even the site's cheapest listings. Refusing a partial set is only usable
+        with retries though: ETMall dropped a page often enough that all-or-nothing
+        left it silent in 3 of 8 searches, and every one of those cleared on a retry.
         """
-        bodies: list[bytes] = []
-        for resp in responses:
-            if isinstance(resp, BaseException) or resp.status_code != 200:  # type: ignore[attr-defined]
-                return None
-            bodies.append(resp.content)  # type: ignore[attr-defined]
-        return bodies or None
+        bodies: list[bytes | None] = [None] * len(urls)
+        pending = list(enumerate(urls))
+
+        for attempt in range(self.PAGE_ATTEMPTS):
+            responses = await asyncio.gather(*(client.get(url) for _, url in pending), return_exceptions=True)  # type: ignore[attr-defined]
+
+            failed = []
+            for (index, url), resp in zip(pending, responses):
+                if isinstance(resp, BaseException) or resp.status_code != 200:
+                    failed.append((index, url))
+                else:
+                    bodies[index] = resp.content
+
+            if not failed:
+                return [body for body in bodies if body is not None] or None
+            pending = failed
+            if attempt + 1 < self.PAGE_ATTEMPTS:
+                await asyncio.sleep(self.PAGE_RETRY_DELAY)
+
+        return None
 
     @abstractmethod
     async def _fetch(self, query: str, max_results: int, *, include_auction: bool = False) -> Payload | None:

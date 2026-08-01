@@ -19,6 +19,7 @@ from price_compare.models import Product
 from price_compare.platforms.base import Candidate
 from price_compare.platforms.books import BooksPlatform
 from price_compare.platforms.coupang import CoupangPlatform
+from price_compare.platforms.etmall import ETMallPlatform
 from price_compare.platforms.pchome import PChomePlatform
 from price_compare.platforms.pxbox import _PxboxProduct
 from price_compare.platforms.rakuten import RakutenPlatform
@@ -315,3 +316,55 @@ def test_adapter_pipeline_produces_products_from_its_own_saved_response(name: st
     assert len(products) <= 3, name
     assert [p.price for p in products] == sorted(p.price for p in products), name
     assert all(p.platform == name for p in products), name
+
+
+class _FlakyClient:
+    """A client whose given page indexes fail on the first attempt only."""
+
+    def __init__(self, fail_first: set[int], fail_always: set[int] = frozenset()) -> None:
+        self.fail_first, self.fail_always = fail_first, fail_always
+        self.seen: list[int] = []
+
+    async def get(self, url: str, **_: object):
+        index = int(url.rsplit("=", 1)[1])
+        self.seen.append(index)
+        if index in self.fail_always or (index in self.fail_first and self.seen.count(index) == 1):
+            msg = "boom"
+            raise RuntimeError(msg)
+        return _Response(f'{{"page": {index}}}'.encode())
+
+
+class _Response:
+    def __init__(self, content: bytes) -> None:
+        self.content, self.status_code = content, 200
+
+
+@pytest.mark.asyncio
+async def test_paged_fetch_retries_only_the_pages_that_failed() -> None:
+    """
+    Test a transient page failure is retried rather than losing the whole set.
+
+    ETMall drops a page often enough that refusing partial sets without retries left it
+    silent in 3 of 8 searches; every one of those cleared on a second attempt.
+    """
+    platform = ETMallPlatform()
+    client = _FlakyClient(fail_first={1})
+    bodies = await platform._fetch_pages(client, [f"https://example.test/?p={i}" for i in range(3)])
+
+    assert bodies is not None
+    assert [msgspec.json.decode(b)["page"] for b in bodies] == [0, 1, 2], "pages must stay in order"
+    assert client.seen == [0, 1, 2, 1], "only the failed page is retried"
+
+
+@pytest.mark.asyncio
+async def test_paged_fetch_gives_up_rather_than_returning_a_hole() -> None:
+    """
+    Test a page that never arrives fails the whole fetch.
+
+    A set with a hole looks complete to the caller, and when the missing page is the
+    first one it is not even the site's cheapest listings.
+    """
+    platform = ETMallPlatform()
+    client = _FlakyClient(fail_first=set(), fail_always={0})
+
+    assert await platform._fetch_pages(client, [f"https://example.test/?p={i}" for i in range(3)]) is None

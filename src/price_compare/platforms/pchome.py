@@ -1,6 +1,5 @@
 """PChome platform implementation."""
 
-import asyncio
 from collections.abc import Iterator
 from contextlib import suppress
 from typing import TYPE_CHECKING
@@ -58,9 +57,7 @@ class PChomePlatform(BasePlatform[list[bytes]]):
 
         async with primp.AsyncClient(impersonate=self._impersonate, timeout=self._timeout, http2_only=True) as client:
             urls = [f"{self._BASE_URL}?q={quote(query)}&page={p}&sort=prc/ac" for p in range(1, pages + 1)]
-            responses = await asyncio.gather(*(client.get(url) for url in urls), return_exceptions=True)
-
-        return self._page_bodies(responses)
+            return await self._fetch_pages(client, urls)
 
     def _extract(self, payload: list[bytes]) -> Iterator[Candidate]:
         """Read products out of each page body."""

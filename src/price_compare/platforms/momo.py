@@ -78,20 +78,36 @@ class MomoPlatform(BasePlatform[list[dict]]):
             http2_only=True,
             headers={"content-type": "application/json", "origin": "https://m.momoshop.com.tw", "referer": "https://m.momoshop.com.tw/"},
         ) as client:
-            tasks = [client.post(self._API_URL, json=self._build_payload(query, p)) for p in range(1, pages + 1)]
-            responses = await asyncio.gather(*tasks, return_exceptions=True)
+            bodies: list[dict | None] = [None] * pages
+            pending = list(range(pages))
 
-            bodies: list[dict] = []
-            for resp in responses:
-                if isinstance(resp, BaseException) or resp.status_code != 200:
-                    return None  # a hole in the pages is not a partial success
-                data = None
-                with suppress(Exception):
-                    data = resp.json()
-                if not data or not data.get("success"):
+            # Retry individual pages rather than discarding the set: a hole is not a
+            # partial success, but refusing partials without retries leaves the whole
+            # platform silent on a transient failure.
+            for attempt in range(self.PAGE_ATTEMPTS):
+                responses = await asyncio.gather(
+                    *(client.post(self._API_URL, json=self._build_payload(query, i + 1)) for i in pending),
+                    return_exceptions=True,
+                )
+                failed = []
+                for index, resp in zip(pending, responses):
+                    data = None
+                    if not isinstance(resp, BaseException) and resp.status_code == 200:
+                        with suppress(Exception):
+                            data = resp.json()
+                    if data and data.get("success"):
+                        bodies[index] = data
+                    else:
+                        failed.append(index)
+
+                if not failed:
+                    break
+                pending = failed
+                if attempt + 1 == self.PAGE_ATTEMPTS:
                     return None
-                bodies.append(data)
-        return bodies or None
+                await asyncio.sleep(self.PAGE_RETRY_DELAY)
+
+        return [body for body in bodies if body is not None] or None
 
     def _extract(self, payload: list[dict]) -> Iterator[Candidate]:
         """Read goods out of each page body."""

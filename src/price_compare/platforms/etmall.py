@@ -1,6 +1,5 @@
 """ETMall (東森購物) platform implementation."""
 
-import asyncio
 from collections.abc import Iterator
 from contextlib import suppress
 from typing import TYPE_CHECKING
@@ -77,9 +76,7 @@ class ETMallPlatform(BasePlatform[list[bytes]]):
                 f"{self._SEARCH_URL}?Keyword={quote(query)}&SortType=4&PageSize={self._PAGE_SIZE}&PageIndex={i}"
                 for i in range(pages)
             ]
-            responses = await asyncio.gather(*(client.get(url) for url in urls), return_exceptions=True)
-
-        return self._page_bodies(responses)
+            return await self._fetch_pages(client, urls)
 
     def _extract(self, payload: list[bytes]) -> Iterator[Candidate]:
         """Read products out of each page body."""
