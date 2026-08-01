@@ -1,5 +1,6 @@
-"""PChome pcone 松果購物 platform implementation."""
+"""松果購物 (pcone.com.tw) platform implementation."""
 
+from collections.abc import Iterator
 from contextlib import suppress
 from typing import TYPE_CHECKING
 
@@ -9,17 +10,17 @@ import never_primp as primp
 if TYPE_CHECKING:
     from never_primp import IMPERSONATE
 
-from price_compare.models import Product
-from price_compare.platforms.base import BasePlatform
-from price_compare.utils import KeywordGroups, matches_keywords, prepare_keyword_groups
+from price_compare.platforms.base import BasePlatform, Candidate
 
 
-class PconePlatform(BasePlatform):
+class PconePlatform(BasePlatform[list[dict]]):
     """松果購物 (pcone.com.tw) platform."""
 
     __slots__ = ("_client", "_impersonate", "_timeout")
 
     name = "pcone"
+    # The API silently ignores a sort field and returns a seed-randomised order, so the
+    # pipeline orders the pool it fetches.
     _SEARCH_URL = "https://webapi.pcone.com.tw/api/products/search"
     # The API host (webapi.pcone.com.tw) only serves requests carrying an
     # Origin/Referer from the storefront; it 302-redirects to "/" otherwise.
@@ -63,73 +64,27 @@ class PconePlatform(BasePlatform):
             client, self._client = self._client, None
             await client.__aexit__(None, None, None)
 
-    async def search(
-        self,
-        query: str,
-        max_results: int = 100,
-        min_price: int = 0,
-        max_price: int = 0,
-        require_words: KeywordGroups = None,
-        **_: object,
-    ) -> list[Product]:
-        """Search products on 松果購物."""
-        # The API has no relevance/price sort param (empirically verified: a
-        # "sort" field is silently ignored). count=100 mirrors the fixed
-        # candidate pool other platforms fetch before filtering down.
+    async def _fetch(self, query: str, max_results: int, *, include_auction: bool = False) -> list[dict] | None:
+        """Request the search API and return its product entries."""
+        # Fixed pool rather than max_results: the response order is randomised, so the
+        # pipeline needs the whole page to find its cheapest members.
         body = {"count": 100, "page": 1, "seed": None, "kw": query}
 
         with suppress(Exception):
             resp = await self._get_client().post(self._SEARCH_URL, json=body)
             if resp.status_code != 200:
-                return []
+                return None
 
-            data = None
-            with suppress(msgspec.DecodeError):
-                data = msgspec.json.decode(resp.content)
-            if not data or data.get("status") != "SUCCESS" or not (payload := data.get("data")):
-                return []
-            if not (products := payload.get("products")):
-                return []
+            data = msgspec.json.decode(resp.content)
+            if data.get("status") != "SUCCESS":
+                return None
+            return (data.get("data") or {}).get("products")
+        return None
 
-            return self._parse_products(products, max_results, min_price, max_price, prepare_keyword_groups(require_words))
-        return []
-
-    def _parse_products(
-        self,
-        products: list[dict],
-        max_results: int,
-        min_price: int,
-        max_price: int,
-        prepared_keywords: tuple[tuple[str, ...], ...] | None,
-    ) -> list[Product]:
-        """Parse product search results into a Product list."""
-        results: list[Product] = []
-        seen_ids: set[str] = set()
-
-        for item in products:
-            display_id = item.get("display_id")
-            if not display_id or display_id in seen_ids:
+    def _extract(self, payload: list[dict]) -> Iterator[Candidate]:
+        """Read products out of the decoded response."""
+        for item in payload:
+            display_id, name, url = item.get("display_id"), item.get("name"), item.get("link_url")
+            if not (display_id and name and url):
                 continue
-
-            if not (name := item.get("name")) or not (url := item.get("link_url")):
-                continue
-            if (price_raw := item.get("price")) is None:
-                continue
-
-            try:
-                price = int(str(price_raw).replace(",", ""))
-            except ValueError:
-                continue
-
-            if price <= 0 or (min_price and price < min_price) or (max_price and price > max_price):
-                continue
-            if not matches_keywords(name.lower(), prepared_keywords):
-                continue
-
-            seen_ids.add(display_id)
-            results.append(Product(name=name, price=price, url=url, platform=self.name))
-
-        # The API returns an unsorted candidate pool and offers no price sort,
-        # so ordering here turns an arbitrary page slice into the cheapest matches.
-        results.sort(key=lambda p: p.price)
-        return results[:max_results]
+            yield Candidate(id=str(display_id), name=name, price=item.get("price"), url=url)

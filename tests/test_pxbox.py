@@ -96,6 +96,7 @@ def test_parse_products_drops_sold_out_and_ad_entries() -> None:
         _PxboxProduct(id=5, product_name="重複 id", sale_price=60),
         _PxboxProduct(id=5, product_name="重複 id 第二筆", sale_price=70),
     ]
-    products = PxboxPlatform()._parse_products(items, 100, 0, 0, None)
+    platform = PxboxPlatform()
+    products = platform.build(platform._extract(items))
 
     assert [p.name for p in products] == ["在架商品", "重複 id"]

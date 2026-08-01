@@ -15,9 +15,11 @@ import pathlib
 import pytest
 
 from price_compare.models import Product
+from price_compare.platforms.base import Candidate
 from price_compare.platforms.books import BooksPlatform
 from price_compare.platforms.coupang import CoupangPlatform
 from price_compare.platforms.uniprosperity import UniProsperityPlatform
+from price_compare.service import PriceCompareService
 
 FIXTURES = pathlib.Path(__file__).parent / "fixtures"
 
@@ -43,8 +45,8 @@ def parse(platform_cls, fixture: str, **kwargs) -> list[Product]:
     they capture, not the page, so pre-unescaping here would hide that.
     """
     content = (FIXTURES / fixture).read_text(encoding="utf-8")
-    defaults = {"max_results": 100, "min_price": 0, "max_price": 0, "prepared_keywords": None}
-    return platform_cls()._parse_products(content, **(defaults | kwargs))
+    platform = platform_cls()
+    return platform.build(platform._extract(content), **kwargs)
 
 
 @pytest.mark.parametrize(("platform_cls", "fixture", "expected"), PARSERS, ids=PARSER_IDS)
@@ -89,12 +91,12 @@ def test_parser_applies_keyword_groups(platform_cls, fixture: str) -> None:
     first = parse(platform_cls, fixture)[0]
     token = first.name.strip()[:2].lower()
 
-    kept = parse(platform_cls, fixture, prepared_keywords=((token,),))
+    kept = parse(platform_cls, fixture, require_words=[[token]])
     assert kept
     assert all(token in p.name.lower() for p in kept)
 
-    assert parse(platform_cls, fixture, prepared_keywords=(("zzz-no-such-product",),)) == []
-    assert parse(platform_cls, fixture, prepared_keywords=((token,), ("zzz-no-such-product",))) == []
+    assert parse(platform_cls, fixture, require_words=[["zzz-no-such-product"]]) == []
+    assert parse(platform_cls, fixture, require_words=[[token], ["zzz-no-such-product"]]) == []
 
 
 @pytest.mark.parametrize(("platform_cls", "fixture"), FIXTURES_ONLY, ids=PARSER_IDS)
@@ -108,7 +110,8 @@ def test_parser_honours_max_results(platform_cls, fixture: str) -> None:
 @pytest.mark.parametrize("platform_cls", CLASSES_ONLY, ids=PARSER_IDS)
 def test_parser_returns_empty_for_unrecognised_markup(platform_cls) -> None:
     """Test a page whose markup no longer matches yields nothing instead of raising."""
-    assert platform_cls()._parse_products("<html><body>404</body></html>", 100, 0, 0, None) == []
+    platform = platform_cls()
+    assert platform.build(platform._extract("<html><body>404</body></html>")) == []
 
 
 @pytest.mark.parametrize("platform_cls", CLASSES_ONLY, ids=PARSER_IDS)
@@ -123,3 +126,48 @@ def test_parser_keeps_names_containing_an_escaped_quote(platform_cls) -> None:
     assert products
     assert any('"' in p.name for p in products), "no product carried the embedded quote"
     assert all("顯示器" in p.name for p in products if '"' in p.name)
+
+
+# Every adapter, driven through the same seam with a hand-built payload. This does not
+# replace the fixture tests above - it checks the contract the pipeline enforces for all
+# 14 platforms, including the ones whose live response is JSON rather than HTML.
+def test_pipeline_enforces_the_contract_for_every_platform() -> None:
+    """Test build() applies the same rules whichever adapter supplied the candidates."""
+    service = PriceCompareService()
+    candidates = [
+        Candidate(id="a", name="  便宜咖啡  ", price="1,200", url="https://example.test/a"),
+        Candidate(id="b", name="貴咖啡", price=9_000.7, url="https://example.test/b"),
+        Candidate(id="a", name="重複 id", price=10, url="https://example.test/dup"),
+        Candidate(id="c", name="無價格", price=None, url="https://example.test/c"),
+        Candidate(id="d", name="零元", price=0, url="https://example.test/d"),
+        Candidate(id="e", name="價格不可解析", price="洽詢", url="https://example.test/e"),
+        Candidate(id="f", name="   ", price=50, url="https://example.test/f"),
+    ]
+
+    for name, platform in service.platforms.items():
+        products = platform.build(iter(candidates))
+
+        assert [p.name for p in products] == ["便宜咖啡", "貴咖啡"], name
+        assert [p.price for p in products] == [1200, 9000], name
+        assert all(p.platform == name for p in products), name
+
+        assert platform.build(iter(candidates), max_results=1)[0].price == 1200, name
+        assert [p.price for p in platform.build(iter(candidates), min_price=2000)] == [9000], name
+        assert [p.price for p in platform.build(iter(candidates), max_price=2000)] == [1200], name
+        assert platform.build(iter(candidates), require_words=[["便宜"]])[0].name == "便宜咖啡", name
+        assert platform.build(iter(candidates), require_words=[["不存在"]]) == [], name
+
+
+def test_pipeline_orders_cheapest_first_regardless_of_input_order() -> None:
+    """
+    Test a site's own ranking cannot leak through as the returned order.
+
+    Coupang and Rakuten both advertise a price-ascending sort and both interleave
+    sponsored placements into it, so the pipeline never trusts the incoming order.
+    """
+    sponsored_first = [
+        Candidate(id=str(i), name=f"商品{i}", price=price, url=f"https://example.test/{i}")
+        for i, price in enumerate([720, 2160, 740, 1080, 1, 1, 1])
+    ]
+    products = CoupangPlatform().build(iter(sponsored_first))
+    assert [p.price for p in products] == [1, 1, 1, 720, 740, 1080, 2160]

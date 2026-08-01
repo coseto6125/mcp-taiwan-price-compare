@@ -1,5 +1,6 @@
 """PXBox (全聯全電商) platform implementation."""
 
+from collections.abc import Iterator
 from contextlib import suppress
 from typing import TYPE_CHECKING
 
@@ -9,9 +10,7 @@ import never_primp as primp
 if TYPE_CHECKING:
     from never_primp import IMPERSONATE
 
-from price_compare.models import Product
-from price_compare.platforms.base import BasePlatform
-from price_compare.utils import KeywordGroups, matches_keywords, prepare_keyword_groups
+from price_compare.platforms.base import BasePlatform, Candidate
 
 
 class _PxboxProduct(msgspec.Struct):
@@ -40,12 +39,14 @@ class _PxboxResponse(msgspec.Struct):
 _decoder = msgspec.json.Decoder(_PxboxResponse, strict=False)
 
 
-class PxboxPlatform(BasePlatform):
+class PxboxPlatform(BasePlatform[list[_PxboxProduct]]):
     """PXBox (全聯全電商, PX Mart's nationwide-shipping storefront) platform."""
 
     __slots__ = ("_impersonate", "_timeout")
 
     name = "pxbox"
+    # sort_type 3 (price) + sort_order 1 (ascending), verified empirically: sort_order 0
+    # falls back to relevance and 2 is descending.
     _SEARCH_URL = "https://api-pxbox.es.pxmart.com.tw/app/2.0/spu/single_search"
     _SITE_URL = "https://pxbox.es.pxmart.com.tw"
     _SUCCESS_CODE = "0000"
@@ -54,28 +55,17 @@ class PxboxPlatform(BasePlatform):
         self._impersonate = impersonate
         self._timeout = timeout
 
-    async def search(
-        self,
-        query: str,
-        max_results: int = 100,
-        min_price: int = 0,
-        max_price: int = 0,
-        require_words: KeywordGroups = None,
-        **_: object,
-    ) -> list[Product]:
-        """Search products on PXBox."""
-        prepared_keywords = prepare_keyword_groups(require_words)
+    async def _fetch(self, query: str, max_results: int, *, include_auction: bool = False) -> list[_PxboxProduct] | None:
+        """Request the search API and return its product entries."""
         payload = msgspec.json.encode(
             {
                 "search_setting_type": 2,
                 "keyword": query,
-                # sort_type 3 (price) + sort_order 1 (ascending) - verified empirically,
-                # sort_order 0 falls back to relevance and 2 is descending.
                 "sort_type": 3,
                 "sort_order": 1,
                 "page_index": 1,
-                # Fixed pool rather than max_results: sold-out and ad entries are
-                # dropped after the fact, so a small request would come back empty.
+                # Fixed pool rather than max_results: sold-out and ad entries are dropped
+                # after the fact, so a small request would come back empty.
                 "page_size": 100,
                 "filters": [],
             }
@@ -90,44 +80,23 @@ class PxboxPlatform(BasePlatform):
             with suppress(Exception):
                 resp = await client.post(self._SEARCH_URL, content=payload)
                 if resp.status_code != 200:
-                    return []
+                    return None
 
                 decoded = _decoder.decode(resp.content)
                 if decoded.code != self._SUCCESS_CODE or decoded.data is None:
-                    return []
+                    return None
+                return decoded.data.product_list
+        return None
 
-                return self._parse_products(decoded.data.product_list, max_results, min_price, max_price, prepared_keywords)
-        return []
-
-    def _parse_products(
-        self,
-        items: list[_PxboxProduct],
-        max_results: int,
-        min_price: int,
-        max_price: int,
-        prepared_keywords: tuple[tuple[str, ...], ...] | None,
-    ) -> list[Product]:
-        """Parse product entries into Product list."""
-        products: list[Product] = []
-        seen_ids: set[int] = set()
-
-        for item in items:
-            if len(products) >= max_results:
-                break
-
-            if not item.product_name or item.id in seen_ids:
-                continue
-            # Sold-out items and ad placements are not genuine cheapest-price matches.
+    def _extract(self, payload: list[_PxboxProduct]) -> Iterator[Candidate]:
+        """Read in-stock, non-ad products out of the decoded response."""
+        for item in payload:
+            # Sold-out listings and ad placements are not genuine cheapest-price matches.
             if item.is_sold_out or item.is_ad:
                 continue
-
-            price = item.sale_price
-            if price <= 0 or (min_price and price < min_price) or (max_price and price > max_price):
-                continue
-            if not matches_keywords(item.product_name.lower(), prepared_keywords):
-                continue
-
-            seen_ids.add(item.id)
-            products.append(Product(name=item.product_name, price=int(price), url=f"{self._SITE_URL}/product/{item.id}", platform=self.name))
-
-        return products
+            yield Candidate(
+                id=str(item.id),
+                name=item.product_name,
+                price=item.sale_price,
+                url=f"{self._SITE_URL}/product/{item.id}",
+            )

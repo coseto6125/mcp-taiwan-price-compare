@@ -1,7 +1,9 @@
 """Yahoo Auction (Yahoo拍賣) platform implementation."""
 
+from collections.abc import Iterator
 from contextlib import suppress
 from typing import TYPE_CHECKING
+from urllib.parse import quote
 
 import msgspec
 import never_primp as primp
@@ -9,9 +11,7 @@ import never_primp as primp
 if TYPE_CHECKING:
     from never_primp import IMPERSONATE
 
-from price_compare.models import Product
-from price_compare.platforms.base import BasePlatform
-from price_compare.utils import KeywordGroups, matches_keywords, prepare_keyword_groups
+from price_compare.platforms.base import BasePlatform, Candidate
 
 # GraphQL persisted query hash - may need update if Yahoo changes their frontend
 _GRAPHQL_HASH = "9e8c95a7bd216439855a6dcb580387b180713a20260a89c26096fbe4dd30133f"
@@ -66,7 +66,7 @@ _graphql_decoder = msgspec.json.Decoder(_GraphQLResponse, strict=False)
 _html_decoder = msgspec.json.Decoder(_IsoreduxData, strict=False)
 
 
-class YahooAuctionPlatform(BasePlatform):
+class YahooAuctionPlatform(BasePlatform[tuple[list, bool]]):
     """Yahoo Auction (Yahoo拍賣) platform."""
 
     __slots__ = ("_impersonate", "_timeout")
@@ -75,6 +75,7 @@ class YahooAuctionPlatform(BasePlatform):
     _GRAPHQL_URL = "https://graphql.ec.yahoo.com/graphql"
     _SITE_URL = "https://tw.bid.yahoo.com"
     _HTML_URL = "https://tw.bid.yahoo.com/search/auction/product"
+    # sort=curp is the site's price-ascending sort; the pipeline confirms the order.
 
     def __init__(
         self,
@@ -84,38 +85,19 @@ class YahooAuctionPlatform(BasePlatform):
         self._impersonate = impersonate
         self._timeout = timeout
 
-    # mypy flags this as an incompatible override: the base absorbs include_auction
-    # through **kwargs, and naming it here widens the signature rather than narrowing
-    # it, which is safe at runtime but not what mypy's Liskov check accepts.
-    async def search(  # type: ignore[override]
-        self,
-        query: str,
-        max_results: int = 100,
-        min_price: int = 0,
-        max_price: int = 0,
-        require_words: KeywordGroups = None,
-        include_auction: bool = False,
-        **_: object,
-    ) -> list[Product]:
-        """Search products on Yahoo Auction."""
-        prepared_keywords = prepare_keyword_groups(require_words)
+    async def _fetch(self, query: str, max_results: int, *, include_auction: bool = False) -> tuple[list, bool] | None:
+        """
+        Fetch hits, GraphQL first and the rendered page as a fallback.
+
+        Returns the hits alongside the buy-now-only flag, because which price field a
+        hit exposes depends on it and `_extract` has no other way to know.
+        """
         buy_now_only = not include_auction
+        hits = await self._fetch_graphql(query, max_results) or await self._fetch_html(query)
+        return (hits, buy_now_only) if hits else None
 
-        # Try GraphQL first, fallback to HTML
-        return await self._search_graphql(query, max_results, min_price, max_price, buy_now_only, prepared_keywords) or await self._search_html(
-            query, max_results, min_price, max_price, buy_now_only, prepared_keywords
-        )
-
-    async def _search_graphql(
-        self,
-        query: str,
-        max_results: int,
-        min_price: int,
-        max_price: int,
-        buy_now_only: bool,
-        prepared_keywords: tuple[tuple[str, ...], ...] | None,
-    ) -> list[Product]:
-        """Search using GraphQL API."""
+    async def _fetch_graphql(self, query: str, max_results: int) -> list | None:
+        """Fetch hits from the GraphQL endpoint."""
         payload = msgspec.json.encode(
             {
                 "variables": {
@@ -147,21 +129,11 @@ class YahooAuctionPlatform(BasePlatform):
                 if resp.status_code == 200:
                     decoded = _graphql_decoder.decode(resp.content)
                     if decoded.data and decoded.data.get_uther:
-                        return self._parse_hits(decoded.data.get_uther.hits, max_results, min_price, max_price, buy_now_only, prepared_keywords)
-        return []
+                        return decoded.data.get_uther.hits
+        return None
 
-    async def _search_html(
-        self,
-        query: str,
-        max_results: int,
-        min_price: int,
-        max_price: int,
-        buy_now_only: bool,
-        prepared_keywords: tuple[tuple[str, ...], ...] | None,
-    ) -> list[Product]:
-        """Fallback: Search by parsing HTML."""
-        from urllib.parse import quote
-
+    async def _fetch_html(self, query: str) -> list | None:
+        """Fall back to the isoredux blob embedded in the rendered search page."""
         url = f"{self._HTML_URL}?p={quote(query)}&clv=0&sort=curp"
 
         async with primp.AsyncClient(
@@ -174,42 +146,28 @@ class YahooAuctionPlatform(BasePlatform):
             with suppress(Exception):
                 resp = await client.get(url)
                 if resp.status_code != 200:
-                    return []
+                    return None
 
-                start_idx = resp.content.find(_ISOREDUX_START)
-                if start_idx == -1:
-                    return []
-                start_idx += len(_ISOREDUX_START)
-                if (end_idx := resp.content.find(_ISOREDUX_END, start_idx)) == -1:
-                    return []
+                start = resp.content.find(_ISOREDUX_START)
+                if start == -1:
+                    return None
+                start += len(_ISOREDUX_START)
+                if (end := resp.content.find(_ISOREDUX_END, start)) == -1:
+                    return None
+                return _html_decoder.decode(resp.content[start:end]).search.ecsearch.hits
+        return None
 
-                data = _html_decoder.decode(resp.content[start_idx:end_idx])
-                return self._parse_hits(data.search.ecsearch.hits, max_results, min_price, max_price, buy_now_only, prepared_keywords)
-        return []
+    def _extract(self, payload: tuple[list, bool]) -> Iterator[Candidate]:
+        """
+        Read hits out of a response.
 
-    def _parse_hits(
-        self,
-        hits: list[_YahooAuctionProduct],
-        max_results: int,
-        min_price: int,
-        max_price: int,
-        buy_now_only: bool,
-        prepared_keywords: tuple[tuple[str, ...], ...] | None,
-    ) -> list[Product]:
-        """Parse product hits into Product list."""
-        products: list[Product] = []
-        seen_ids: set[str] = set()
-
+        Buy-now-only keeps listings that carry a buy price; otherwise a bid-only
+        listing falls back to its current bid.
+        """
+        hits, buy_now_only = payload
         for item in hits:
-            if len(products) >= max_results:
-                break
-
-            if not item.ec_title or not item.ec_item_url:
+            if not item.ec_item_url:
                 continue
-            if item.ec_productid in seen_ids:
-                continue
-
-            # Determine price based on buy_now_only flag
             if buy_now_only:
                 if item.ec_buyprice <= 0:
                     continue
@@ -217,14 +175,6 @@ class YahooAuctionPlatform(BasePlatform):
             else:
                 price = item.ec_buyprice if item.ec_buyprice > 0 else item.ec_price
 
-            if price <= 0 or (min_price and price < min_price) or (max_price and price > max_price):
-                continue
-            if not matches_keywords(item.ec_title.lower(), prepared_keywords):
-                continue
-
-            seen_ids.add(item.ec_productid)
-            # Some hits carry a site-relative path instead of an absolute URL
+            # Some hits carry a site-relative path instead of an absolute URL.
             url = item.ec_item_url if item.ec_item_url.startswith("http") else f"{self._SITE_URL}{item.ec_item_url}"
-            products.append(Product(name=item.ec_title, price=int(price), url=url, platform=self.name))
-
-        return products
+            yield Candidate(id=item.ec_productid, name=item.ec_title, price=price, url=url)

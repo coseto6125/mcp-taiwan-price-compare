@@ -180,6 +180,9 @@ dummy-variable-rgx = "^(_.*|dummy)$" # 允許特定形式的未使用變數命�
 
 [tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["F401"] # __init__.py 中允許未使用的 import
+"src/price_compare/platforms/*.py" = [
+  "ARG002"
+] # _fetch 須符合基底簽章，個別站台不一定用得到每個參數
 "tests/*" = ["D100", "D101"] # 測試目錄忽略公用模組與類別缺少 docstring
 "conftest.py" = [
   "D100",

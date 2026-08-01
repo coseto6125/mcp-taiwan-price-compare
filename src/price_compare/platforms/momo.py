@@ -1,8 +1,8 @@
 """momo platform implementation."""
 
 import asyncio
+from collections.abc import Iterator
 from contextlib import suppress
-from operator import attrgetter
 from typing import TYPE_CHECKING
 
 import never_primp as primp
@@ -11,8 +11,8 @@ if TYPE_CHECKING:
     from never_primp import IMPERSONATE
 
 from price_compare.models import Product
-from price_compare.platforms.base import BasePlatform
-from price_compare.utils import KeywordGroups, calc_search_multiplier, matches_keywords, prepare_keyword_groups
+from price_compare.platforms.base import BasePlatform, Candidate
+from price_compare.utils import KeywordGroups, calc_search_multiplier
 
 # Static payload template (filters that never change)
 _PAYLOAD_TEMPLATE: dict = {
@@ -49,7 +49,7 @@ _PAYLOAD_TEMPLATE: dict = {
 }
 
 
-class MomoPlatform(BasePlatform):
+class MomoPlatform(BasePlatform[list[dict]]):
     """momo shopping platform."""
 
     __slots__ = ("_impersonate", "_timeout")
@@ -58,6 +58,7 @@ class MomoPlatform(BasePlatform):
     _API_URL = "https://apisearch.momoshop.com.tw/momoSearchCloud/moec/textSearch"
     _PRODUCT_URL = "https://www.momoshop.com.tw/goods/GoodsDetail.jsp?i_code={}"
     _PAGE_SIZE = 20
+    _MAX_PAGES = 5
 
     def __init__(self, impersonate: "IMPERSONATE | None" = "chrome_142", timeout: float = 30.0) -> None:
         self._impersonate = impersonate
@@ -70,12 +71,25 @@ class MomoPlatform(BasePlatform):
         min_price: int = 0,
         max_price: int = 0,
         require_words: KeywordGroups = None,
-        **_: object,
+        include_auction: bool = False,
+        **kwargs: object,
     ) -> list[Product]:
-        """Search products on momo."""
-        prepared_keywords = prepare_keyword_groups(require_words)
-        adjusted_max = max_results * calc_search_multiplier(require_words)
-        pages_needed = min(-(-adjusted_max // self._PAGE_SIZE), 5)  # Ceiling division, max 5 pages
+        """Search products on momo, widening the request when a keyword filter is set."""
+        # Each AND group roughly halves the pass rate, so ask for more before filtering.
+        pool = max_results * calc_search_multiplier(require_words)
+        payload = await self._fetch(query, pool)
+        if payload is None:
+            return []
+        return self.build(self._extract(payload), max_results, min_price, max_price, require_words)
+
+    async def _fetch(self, query: str, max_results: int, *, include_auction: bool = False) -> list[dict] | None:
+        """
+        Fetch as many result pages as max_results needs, concurrently.
+
+        The mobile API fixes its page at 20 items with no size parameter, so covering
+        max_results means issuing that many requests.
+        """
+        pages = min(-(-max_results // self._PAGE_SIZE), self._MAX_PAGES)  # ceiling division
 
         async with primp.AsyncClient(
             impersonate=self._impersonate,
@@ -84,12 +98,32 @@ class MomoPlatform(BasePlatform):
             http2_only=True,
             headers={"content-type": "application/json", "origin": "https://m.momoshop.com.tw", "referer": "https://m.momoshop.com.tw/"},
         ) as client:
-            tasks = [client.post(self._API_URL, json=self._build_payload(query, p)) for p in range(1, pages_needed + 1)]
+            tasks = [client.post(self._API_URL, json=self._build_payload(query, p)) for p in range(1, pages + 1)]
             responses = await asyncio.gather(*tasks, return_exceptions=True)
 
-            products = self._parse_responses(responses, max_results, min_price, max_price, prepared_keywords)
+            bodies = []
+            for resp in responses:
+                if isinstance(resp, BaseException) or resp.status_code != 200:
+                    continue
+                with suppress(Exception):
+                    data = resp.json()
+                    if data.get("success"):
+                        bodies.append(data)
+        return bodies or None
 
-        return sorted(products, key=attrgetter("price"))[:max_results]
+    def _extract(self, payload: list[dict]) -> Iterator[Candidate]:
+        """Read goods out of each page body."""
+        for data in payload:
+            for item in (data.get("rtnSearchData") or {}).get("goodsInfoList") or []:
+                goods_code, name = item.get("goodsCode"), item.get("goodsName")
+                if not (goods_code and name):
+                    continue
+                yield Candidate(
+                    id=goods_code,
+                    name=name,
+                    price=item.get("SALE_PRICE"),
+                    url=self._PRODUCT_URL.format(goods_code),
+                )
 
     def _build_payload(self, query: str, page: int) -> dict:
         """Build API request payload."""
@@ -98,52 +132,3 @@ class MomoPlatform(BasePlatform):
             "flag": _PAYLOAD_TEMPLATE["flag"],
             "data": {**_PAYLOAD_TEMPLATE["data"], "searchValue": query, "curPage": page},
         }
-
-    def _parse_responses(
-        self,
-        responses: list,
-        max_results: int,
-        min_price: int,
-        max_price: int,
-        prepared_keywords: tuple[tuple[str, ...], ...] | None,
-    ) -> list[Product]:
-        """Parse API responses into Product list."""
-        products: list[Product] = []
-        seen_ids: set[str] = set()
-
-        for resp in responses:
-            if isinstance(resp, BaseException) or resp.status_code != 200:
-                continue
-
-            data = None
-            with suppress(Exception):
-                data = resp.json()
-            if not data or not data.get("success"):
-                continue
-            if not (goods_list := data.get("rtnSearchData", {}).get("goodsInfoList")):
-                continue
-
-            for item in goods_list:
-                if len(products) >= max_results:
-                    return products
-
-                # Early exit: check seen_ids first (O(1) lookup)
-                if not (goods_code := item.get("goodsCode")) or goods_code in seen_ids:
-                    continue
-                if not (name := item.get("goodsName")) or not (price := item.get("SALE_PRICE")):
-                    continue
-
-                # Parse price
-                with suppress(ValueError):
-                    price_int = int(str(price).replace("$", "").replace(",", ""))
-
-                    # Combined price filter
-                    if price_int <= 0 or (min_price and price_int < min_price) or (max_price and price_int > max_price):
-                        continue
-                    if not matches_keywords(name.lower(), prepared_keywords):
-                        continue
-
-                    seen_ids.add(goods_code)
-                    products.append(Product(name=name, price=price_int, url=self._PRODUCT_URL.format(goods_code), platform=self.name))
-
-        return products

@@ -59,6 +59,31 @@ def matches_keywords(name_lower: str, prepared_groups: tuple[tuple[str, ...], ..
     return all(any(kw in name_lower for kw in group) for group in prepared_groups)
 
 
+def parse_price(value: object) -> int | None:
+    """
+    Coerce a site's price field to whole TWD, or None when it is not a price.
+
+    Sites hand back ints, floats, and strings like "1,299" or "$1,299"; every adapter
+    used to strip and cast this itself, each guarding failure differently.
+
+    Args:
+        value: Raw price as the site reported it.
+
+    Returns:
+        The price as an int, or None if it cannot be read as one.
+    """
+    if isinstance(value, bool) or value is None:
+        return None
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float):
+        return int(value)
+    try:
+        return int(float(str(value).replace(",", "").replace("$", "").strip()))
+    except (TypeError, ValueError):
+        return None
+
+
 def calc_search_multiplier(require_words: KeywordGroups) -> int:
     """
     Calculate search volume multiplier based on require_words filter strictness.

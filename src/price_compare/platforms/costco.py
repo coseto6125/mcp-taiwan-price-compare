@@ -1,5 +1,6 @@
 """Costco Taiwan (好市多) platform implementation."""
 
+from collections.abc import Iterator
 from contextlib import suppress
 from typing import TYPE_CHECKING
 
@@ -9,17 +10,19 @@ import never_primp as primp
 if TYPE_CHECKING:
     from never_primp import IMPERSONATE
 
-from price_compare.models import Product
-from price_compare.platforms.base import BasePlatform
-from price_compare.utils import KeywordGroups, matches_keywords, prepare_keyword_groups
+from price_compare.platforms.base import BasePlatform, Candidate
 
 
-class CostcoPlatform(BasePlatform):
+class CostcoPlatform(BasePlatform[list[dict]]):
     """Costco Taiwan (好市多) platform."""
 
     __slots__ = ("_impersonate", "_timeout")
 
     name = "costco"
+    # Server-side price sort keeps the query intact (same totalResults as relevance) and
+    # reaches cheap items that rank past the first page, which sorting one relevance page
+    # client-side would miss. It leads with in-warehouse-only items carrying no price at
+    # all, which the pipeline drops for having no readable price.
     _SEARCH_URL = "https://www.costco.com.tw/rest/v2/taiwan/products/search"
     _BASE_URL = "https://www.costco.com.tw"
 
@@ -27,26 +30,13 @@ class CostcoPlatform(BasePlatform):
         self._impersonate = impersonate
         self._timeout = timeout
 
-    async def search(
-        self,
-        query: str,
-        max_results: int = 100,
-        min_price: int = 0,
-        max_price: int = 0,
-        require_words: KeywordGroups = None,
-        **_: object,
-    ) -> list[Product]:
-        """Search products on Costco Taiwan."""
+    async def _fetch(self, query: str, max_results: int, *, include_auction: bool = False) -> list[dict] | None:
+        """Request the OCC search endpoint and return its product entries."""
         params = {
             "query": query,
             "fields": "FULL",
             "lang": "zh_TW",
             "curr": "TWD",
-            # Server-side price sort keeps the query intact (same totalResults as
-            # relevance) and reaches cheap items that rank past the first page,
-            # which a client-side sort of one relevance page would miss. It leads
-            # with in-warehouse-only items that carry no price at all, so entries
-            # without a price value are dropped below.
             "sort": "price-asc",
             "pageSize": "100",
         }
@@ -58,56 +48,18 @@ class CostcoPlatform(BasePlatform):
             http2_only=True,
             headers={"accept": "application/json", "referer": "https://www.costco.com.tw/search"},
         ) as client:
-            resp = await client.get(self._SEARCH_URL, params=params)
-            if resp.status_code != 200:
-                return []
+            with suppress(Exception):
+                resp = await client.get(self._SEARCH_URL, params=params)
+                if resp.status_code != 200:
+                    return None
+                return msgspec.json.decode(resp.content).get("products")
+        return None
 
-            data = None
-            with suppress(msgspec.DecodeError):
-                data = msgspec.json.decode(resp.content)
-            if not data or not (products := data.get("products")):
-                return []
-
-            return self._parse_products(products, max_results, min_price, max_price, prepare_keyword_groups(require_words))
-
-    def _parse_products(
-        self,
-        products: list[dict],
-        max_results: int,
-        min_price: int,
-        max_price: int,
-        prepared_keywords: tuple[tuple[str, ...], ...] | None,
-    ) -> list[Product]:
-        """Parse product search results into a Product list."""
-        results: list[Product] = []
-        seen_codes: set[str] = set()
-
-        for item in products:
-            if len(results) >= max_results:
-                break
-
-            code = item.get("code")
-            if not code or code in seen_codes:
+    def _extract(self, payload: list[dict]) -> Iterator[Candidate]:
+        """Read products out of the decoded response."""
+        for item in payload:
+            code, name, url = item.get("code"), item.get("name"), item.get("url")
+            price = (item.get("price") or {}).get("value")
+            if not (code and name and url):
                 continue
-
-            if not (name := item.get("name")) or not (url := item.get("url")):
-                continue
-            if not (price_obj := item.get("price")) or (price_value := price_obj.get("value")) is None:
-                continue
-
-            # price_value comes off an untyped dict, so a non-numeric entry would raise
-            # here rather than skip the product the way every other guard in this loop does.
-            try:
-                price = int(price_value)
-            except (TypeError, ValueError):
-                continue
-
-            if price <= 0 or (min_price and price < min_price) or (max_price and price > max_price):
-                continue
-            if not matches_keywords(name.lower(), prepared_keywords):
-                continue
-
-            seen_codes.add(code)
-            results.append(Product(name=name, price=price, url=f"{self._BASE_URL}{url}", platform=self.name))
-
-        return results
+            yield Candidate(id=code, name=name, price=price, url=f"{self._BASE_URL}{url}")
