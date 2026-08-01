@@ -1,5 +1,6 @@
 """MCP server for price comparison across Taiwan e-commerce platforms."""
 
+import asyncio
 from typing import Literal
 
 from etoon import dumps as toon_encode
@@ -84,7 +85,12 @@ async def compare_prices(
 
 def main() -> None:
     """Entry point for MCP server."""
-    mcp.run()
+    try:
+        mcp.run()
+    finally:
+        # One platform holds a connection open across searches; release it on the way
+        # out rather than leaving it to interpreter teardown.
+        asyncio.run(service.aclose())
 
 
 if __name__ == "__main__":

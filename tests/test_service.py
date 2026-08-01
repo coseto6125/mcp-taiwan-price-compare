@@ -95,14 +95,36 @@ class TestPriceCompareService:
             await service.search_all_platforms("咖啡", max_per_platform=5, mode="FAST")
 
     @pytest.mark.asyncio
-    async def test_aclose_releases_held_connections_and_stays_usable(self) -> None:
-        """Test closing frees the one platform holding a connection, and search still works."""
+    async def test_aclose_closes_the_held_connection(self) -> None:
+        """
+        Test aclose awaits the client's own close, not just drops the reference.
+
+        Setting _client = None alone would satisfy any check on the attribute, so this
+        records whether close() was actually awaited.
+        """
+        closed: list[bool] = []
+
+        class _Recording:
+            async def close(self) -> None:
+                closed.append(True)
+
+        service = PriceCompareService()
+        service.platforms["pcone"]._client = _Recording()
+        await service.aclose()
+
+        assert closed == [True]
+        assert service.platforms["pcone"]._client is None
+
+    @pytest.mark.asyncio
+    async def test_aclose_is_idempotent_and_leaves_the_platform_usable(self) -> None:
+        """Test closing twice is safe and a later search reopens a connection."""
         service = PriceCompareService()
         await service.platforms["pcone"].search("咖啡", max_results=3)
         assert service.platforms["pcone"]._client is not None
 
         await service.aclose()
+        await service.aclose()
         assert service.platforms["pcone"]._client is None
 
-        await service.aclose()
         assert await service.platforms["pcone"].search("咖啡", max_results=3)
+        await service.aclose()

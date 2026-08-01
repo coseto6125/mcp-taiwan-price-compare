@@ -20,10 +20,14 @@ from price_compare.platforms.base import Candidate
 from price_compare.platforms.books import BooksPlatform
 from price_compare.platforms.coupang import CoupangPlatform
 from price_compare.platforms.pchome import PChomePlatform
+from price_compare.platforms.pxbox import _PxboxProduct
 from price_compare.platforms.rakuten import RakutenPlatform
+from price_compare.platforms.ruten import _Item
 from price_compare.platforms.uniprosperity import UniProsperityPlatform
 from price_compare.platforms.yahoo_auction import YahooAuctionPlatform, _YahooAuctionProduct
+from price_compare.platforms.yahoo_shopping import _YahooProduct
 from price_compare.service import PriceCompareService
+from price_compare.utils import parse_price
 
 FIXTURES = pathlib.Path(__file__).parent / "fixtures"
 
@@ -141,7 +145,7 @@ def test_pipeline_enforces_the_contract_for_every_platform() -> None:
     candidates = [
         Candidate(id="a", name="  便宜咖啡  ", price="1,200", url="https://example.test/a"),
         Candidate(id="b", name="貴咖啡", price=9_000.7, url="https://example.test/b"),
-        Candidate(id="a", name="重複 id", price=10, url="https://example.test/dup"),
+        Candidate(id="a", name="同 id 但更便宜", price=10, url="https://example.test/dup"),
         Candidate(id="c", name="無價格", price=None, url="https://example.test/c"),
         Candidate(id="d", name="零元", price=0, url="https://example.test/d"),
         Candidate(id="e", name="價格不可解析", price="洽詢", url="https://example.test/e"),
@@ -151,14 +155,15 @@ def test_pipeline_enforces_the_contract_for_every_platform() -> None:
     for name, platform in service.platforms.items():
         products = platform.build(iter(candidates))
 
-        assert [p.name for p in products] == ["便宜咖啡", "貴咖啡"], name
-        assert [p.price for p in products] == [1200, 9000], name
+        # A repeated id keeps its cheapest entry, not whichever the site listed first.
+        assert [p.name for p in products] == ["同 id 但更便宜", "貴咖啡"], name
+        assert [p.price for p in products] == [10, 9000], name
         assert all(p.platform == name for p in products), name
 
-        assert platform.build(iter(candidates), max_results=1)[0].price == 1200, name
+        assert platform.build(iter(candidates), max_results=1)[0].price == 10, name
         assert [p.price for p in platform.build(iter(candidates), min_price=2000)] == [9000], name
-        assert [p.price for p in platform.build(iter(candidates), max_price=2000)] == [1200], name
-        assert platform.build(iter(candidates), require_words=[["便宜"]])[0].name == "便宜咖啡", name
+        assert [p.price for p in platform.build(iter(candidates), max_price=2000)] == [10], name
+        assert platform.build(iter(candidates), require_words=[["便宜"]])[0].price == 10, name
         assert platform.build(iter(candidates), require_words=[["不存在"]]) == [], name
 
 
@@ -210,17 +215,20 @@ def test_pchome_drops_add_on_only_items() -> None:
 
 @pytest.mark.parametrize(
     "title",
-    [
+        [
         "【徵】 Fiio RC-BT 藍牙耳機線",
-        "藍牙耳機 維修 換電池,1~3個月",
-        "深咖啡個性秋冬款襯衫一元起運費可合併",
-        "愛呀！莉奈♥賣場商品滿699隨選贈一 AirPods保護套",
-        "浴櫃鏡櫃皆可量身訂做1公分35元",
+        "求購75年76年蔣公拾元硬幣，一枚100元收",
+        "已賣出請勿下標 牛仔褲短褲",
+        "【小白代購-預購訂金專場】旅美球員卡代購",
+        "【訂金、運費、板費、製稿費】下標專區",
+        "[現貨出租] 馬力歐互動手環",
+        "工業風小銼刀×5 職人工具 1元起標",
+        "愛呀！莉奈♥賣場商品隨選贈一 AirPods保護套",
     ],
 )
 def test_yahoo_auction_drops_non_retail_listings(title: str) -> None:
     """
-    Test wanted ads, services, auction bait, and gift entries never reach a caller.
+    Test wanted ads, deposits, rentals, placeholders and bait never reach a caller.
 
     Each of these was in the cheapest ten for a real query. None is a product offered
     at the price shown, and the site exposes no field marking them.
@@ -230,10 +238,80 @@ def test_yahoo_auction_drops_non_retail_listings(title: str) -> None:
     assert list(platform._extract(([hit], True))) == []
 
 
-def test_yahoo_auction_keeps_ordinary_listings() -> None:
-    """Test the non-retail markers do not swallow a normal product."""
+@pytest.mark.parametrize(
+    "title",
+    [
+        "SONY WF-1000XM5 真無線藍牙耳機",
+        "塑膠拆機棒 手機開殼工具 維修工具",  # 維修 names what the tool is for
+        "客製化大頭照印章",  # 客製化 describes the product, not the transaction
+        "2x5cm 宣傳章・訂製印章",
+        "手機螢幕維修膠 現貨",
+    ],
+)
+def test_yahoo_auction_keeps_ordinary_listings(title: str) -> None:
+    """
+    Test the markers match transaction intent, not topic words.
+
+    An earlier version matched bare 維修 / 訂製 / 客製化 and threw away 49 of 60 results
+    for "維修工具" and 21 for "訂製 印章" - goods sold at the price shown whose titles
+    merely name what they are for.
+    """
     platform = YahooAuctionPlatform()
     hit = _YahooAuctionProduct(
-        ec_title="SONY WF-1000XM5 真無線藍牙耳機", ec_buyprice=6990.0, ec_item_url="https://tw.bid.yahoo.com/item/2", ec_productid="2"
+        ec_title=title, ec_buyprice=6990.0, ec_item_url="https://tw.bid.yahoo.com/item/2", ec_productid="2"
     )
-    assert [c.name for c in platform._extract(([hit], True))] == ["SONY WF-1000XM5 真無線藍牙耳機"]
+    assert [c.name for c in platform._extract(([hit], True))] == [title]
+
+
+# One saved response per adapter, replayed through that adapter's own `_extract`. The
+# `build()` contract test above deliberately hand-builds Candidates, so on its own it
+# would still pass with an adapter's `_extract` gutted - this is what catches that.
+PAYLOAD_LOADERS = {
+    "costco": msgspec.json.decode,
+    "buy123": msgspec.json.decode,
+    "pcone": msgspec.json.decode,
+    "rakuten": msgspec.json.decode,
+    "momo": msgspec.json.decode,
+    "pxbox": lambda blob: msgspec.json.decode(blob, type=list[_PxboxProduct]),
+    "ruten": lambda blob: msgspec.json.decode(blob, type=list[_Item]),
+    "yahoo_shopping": lambda blob: msgspec.json.decode(blob, type=list[_YahooProduct]),
+    "etmall": lambda blob: [p.encode() for p in msgspec.json.decode(blob)],
+    "pchome": lambda blob: [p.encode() for p in msgspec.json.decode(blob)],
+    "yahoo_auction": lambda blob: (
+        msgspec.json.decode(msgspec.json.encode(msgspec.json.decode(blob)["hits"]), type=list[_YahooAuctionProduct]),
+        msgspec.json.decode(blob)["buy_now_only"],
+    ),
+}
+
+
+def load_payload(name: str):
+    """Load an adapter's saved response in the shape its `_extract` expects."""
+    return PAYLOAD_LOADERS[name]((FIXTURES / f"{name}_payload.json").read_bytes())
+
+
+@pytest.mark.parametrize("name", sorted(PAYLOAD_LOADERS), ids=sorted(PAYLOAD_LOADERS))
+def test_adapter_extracts_candidates_from_its_own_saved_response(name: str) -> None:
+    """Test each adapter reads products out of a real response from its own site."""
+    platform = PriceCompareService().platforms[name]
+    candidates = list(platform._extract(load_payload(name)))
+
+    assert candidates, f"{name} extracted nothing from its saved response"
+    assert all(c.id for c in candidates), name
+    assert all(c.name.strip() for c in candidates), name
+    assert all(c.url.startswith("https://") for c in candidates), name
+    # Reading a response is not judging it: Costco's price-ascending page leads with
+    # in-warehouse-only entries carrying no price, and dropping those is the pipeline's
+    # job. What `_extract` owes is a usable price on at least the sellable ones.
+    assert any(parse_price(c.price) for c in candidates), name
+
+
+@pytest.mark.parametrize("name", sorted(PAYLOAD_LOADERS), ids=sorted(PAYLOAD_LOADERS))
+def test_adapter_pipeline_produces_products_from_its_own_saved_response(name: str) -> None:
+    """Test the whole offline path, extract through build, for every adapter."""
+    platform = PriceCompareService().platforms[name]
+    products = platform.build(platform._extract(load_payload(name)), max_results=3)
+
+    assert products, name
+    assert len(products) <= 3, name
+    assert [p.price for p in products] == sorted(p.price for p in products), name
+    assert all(p.platform == name for p in products), name

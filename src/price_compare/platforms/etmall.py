@@ -12,9 +12,7 @@ import never_primp as primp
 if TYPE_CHECKING:
     from never_primp import IMPERSONATE
 
-from price_compare.models import Product
 from price_compare.platforms.base import BasePlatform, Candidate
-from price_compare.utils import KeywordGroups, calc_search_multiplier
 
 
 class _ProductData(msgspec.Struct, rename="camel"):
@@ -59,24 +57,6 @@ class ETMallPlatform(BasePlatform[list[bytes]]):
         self._impersonate = impersonate
         self._timeout = timeout
 
-    async def search(
-        self,
-        query: str,
-        max_results: int = 100,
-        min_price: int = 0,
-        max_price: int = 0,
-        require_words: KeywordGroups = None,
-        include_auction: bool = False,
-        **kwargs: object,
-    ) -> list[Product]:
-        """Search products on ETMall, widening the request when a keyword filter is set."""
-        # Each AND group roughly halves the pass rate, so ask for more before filtering.
-        pool = min(max_results * calc_search_multiplier(require_words), 200)
-        payload = await self._fetch(query, pool)
-        if payload is None:
-            return []
-        return self.build(self._extract(payload), max_results, min_price, max_price, require_words)
-
     async def _fetch(self, query: str, max_results: int, *, include_auction: bool = False) -> list[bytes] | None:
         """
         Fetch as many result pages as max_results needs, concurrently.
@@ -99,8 +79,7 @@ class ETMallPlatform(BasePlatform[list[bytes]]):
             ]
             responses = await asyncio.gather(*(client.get(url) for url in urls), return_exceptions=True)
 
-        bodies = [r.content for r in responses if not isinstance(r, BaseException) and r.status_code == 200]
-        return bodies or None
+        return self._page_bodies(responses)
 
     def _extract(self, payload: list[bytes]) -> Iterator[Candidate]:
         """Read products out of each page body."""

@@ -1,5 +1,6 @@
 """松果購物 (pcone.com.tw) platform implementation."""
 
+import asyncio
 from collections.abc import Iterator
 from contextlib import suppress
 from typing import TYPE_CHECKING
@@ -26,6 +27,8 @@ class PconePlatform(BasePlatform[list[dict]]):
     # Origin/Referer from the storefront; it 302-redirects to "/" otherwise.
     _REFERER = "https://pcone.com.tw/search"
     _ORIGIN = "https://pcone.com.tw"
+    _CLOSE_ATTEMPTS = 5
+    _CLOSE_RETRY_DELAY = 0.2
 
     def __init__(self, impersonate: "IMPERSONATE | None" = "chrome_142", timeout: float = 30.0) -> None:
         self._impersonate = impersonate
@@ -62,15 +65,24 @@ class PconePlatform(BasePlatform[list[dict]]):
         """
         Close the reused connection. Idempotent, and a later search reopens one.
 
-        Best-effort: primp runs each request on a worker thread, so a request this
-        client was cancelled out of by a caller's timeout can still hold the underlying
-        handle. The reference is dropped either way and the handle is freed when that
-        thread finishes.
+        primp runs each request on a worker thread, so a request the caller's timeout
+        cancelled can still hold the underlying handle and the first close raises
+        "Already borrowed". That resolves once the thread finishes, so this retries
+        briefly rather than swallowing it. Any other close error is left to surface.
         """
-        if self._client is not None:
-            client, self._client = self._client, None
-            with suppress(Exception):
+        if self._client is None:
+            return
+
+        client, self._client = self._client, None
+        for attempt in range(self._CLOSE_ATTEMPTS):
+            try:
                 await client.close()
+            except RuntimeError as exc:
+                if "borrow" not in str(exc).lower() or attempt + 1 == self._CLOSE_ATTEMPTS:
+                    raise
+                await asyncio.sleep(self._CLOSE_RETRY_DELAY)
+            else:
+                return
 
     async def _fetch(self, query: str, max_results: int, *, include_auction: bool = False) -> list[dict] | None:
         """Request the search API and return its product entries."""

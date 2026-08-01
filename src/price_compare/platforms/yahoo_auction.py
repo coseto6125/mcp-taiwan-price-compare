@@ -20,15 +20,20 @@ _GRAPHQL_HASH = "9e8c95a7bd216439855a6dcb580387b180713a20260a89c26096fbe4dd30133
 # HTML fallback markers
 # Listing kinds that are not a product offered at the stated price. This is a C2C
 # marketplace, so alongside goods it carries wanted ads (the buyer is the one posting),
-# repair and custom-order services, gift-with-purchase entries, and auctions baiting
-# with a $1 buy-now. None are comparable against a retail price, and the site exposes
-# no field for them - the seller's own wording is the only signal.
+# deposit-only entries, rentals, and placeholders. The site exposes no field for any of
+# them, so the seller's own wording is the only signal.
+#
+# These have to be transaction-intent phrases, not topic words. An earlier version
+# matched bare 維修 / 訂製 / 客製化 / 收購 and threw away 49 of 60 results for
+# "維修工具" and 21 for "訂製 印章" - real goods sold at the price shown, whose titles
+# merely name what they are for.
 _NON_RETAIL_MARKERS = re.compile(
-    r"【徵】|徵求|徵收|收購"  # wanted ads
-    r"|維修|換電池|修理"  # repair services
-    r"|客製化|訂做|訂製|報價|意者[請可]?私"  # made-to-order and quote-on-request
-    r"|[1一]元起|起標"  # auctions baiting with a $1 buy-now
-    r"|滿\d+.{0,4}[贈送]|隨選贈|加購價"  # gift-with-purchase and add-on entries
+    r"求購|徵求|收購中|高價收|【徵】"  # the poster is buying, not selling
+    r"|請勿下標|勿下標|測試商品|下標前[請先]"  # placeholders and do-not-buy notices
+    r"|訂金專[區場]|訂金及|下標專區|補差價|運費專[區用]"  # deposits and top-up entries
+    r"|出租|租借|日租|月租"  # rentals
+    r"|[1一]元起標|起標價"  # auctions baiting with a $1 buy-now
+    r"|隨選贈|滿額贈"  # gift-with-purchase entries
 )
 
 _ISOREDUX_START = b'<script id="isoredux-data" type="mime/invalid">'

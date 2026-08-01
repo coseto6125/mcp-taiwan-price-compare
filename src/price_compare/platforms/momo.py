@@ -10,9 +10,7 @@ import never_primp as primp
 if TYPE_CHECKING:
     from never_primp import IMPERSONATE
 
-from price_compare.models import Product
 from price_compare.platforms.base import BasePlatform, Candidate
-from price_compare.utils import KeywordGroups, calc_search_multiplier
 
 # Static payload template (filters that never change)
 _PAYLOAD_TEMPLATE: dict = {
@@ -64,24 +62,6 @@ class MomoPlatform(BasePlatform[list[dict]]):
         self._impersonate = impersonate
         self._timeout = timeout
 
-    async def search(
-        self,
-        query: str,
-        max_results: int = 100,
-        min_price: int = 0,
-        max_price: int = 0,
-        require_words: KeywordGroups = None,
-        include_auction: bool = False,
-        **kwargs: object,
-    ) -> list[Product]:
-        """Search products on momo, widening the request when a keyword filter is set."""
-        # Each AND group roughly halves the pass rate, so ask for more before filtering.
-        pool = max_results * calc_search_multiplier(require_words)
-        payload = await self._fetch(query, pool)
-        if payload is None:
-            return []
-        return self.build(self._extract(payload), max_results, min_price, max_price, require_words)
-
     async def _fetch(self, query: str, max_results: int, *, include_auction: bool = False) -> list[dict] | None:
         """
         Fetch as many result pages as max_results needs, concurrently.
@@ -101,14 +81,16 @@ class MomoPlatform(BasePlatform[list[dict]]):
             tasks = [client.post(self._API_URL, json=self._build_payload(query, p)) for p in range(1, pages + 1)]
             responses = await asyncio.gather(*tasks, return_exceptions=True)
 
-            bodies = []
+            bodies: list[dict] = []
             for resp in responses:
                 if isinstance(resp, BaseException) or resp.status_code != 200:
-                    continue
+                    return None  # a hole in the pages is not a partial success
+                data = None
                 with suppress(Exception):
                     data = resp.json()
-                    if data.get("success"):
-                        bodies.append(data)
+                if not data or not data.get("success"):
+                    return None
+                bodies.append(data)
         return bodies or None
 
     def _extract(self, payload: list[dict]) -> Iterator[Candidate]:

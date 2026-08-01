@@ -1,6 +1,7 @@
 """Shared utilities for price comparison service."""
 
 import itertools
+import math
 from typing import Any, Iterable
 
 # Type alias for keyword groups: [[group1_kw1, group1_kw2], [group2_kw1, group2_kw2]]
@@ -76,18 +77,11 @@ def parse_price(value: object) -> int | None:
         return None
     if isinstance(value, int):
         return value
-    if isinstance(value, float):
-        return int(value)
     try:
-        return int(float(str(value).replace(",", "").replace("$", "").strip()))
-    except (TypeError, ValueError):
+        # NaN and infinities reach here from JSON payloads and from strings like
+        # "1e309"; int() raises on both, which would escape the whole search.
+        number = value if isinstance(value, float) else float(str(value).replace(",", "").replace("$", "").strip())
+        return int(number) if math.isfinite(number) else None
+    except (TypeError, ValueError, OverflowError):
         return None
 
-
-def calc_search_multiplier(require_words: KeywordGroups) -> int:
-    """
-    Calculate search volume multiplier based on require_words filter strictness.
-
-    Each AND group roughly halves pass rate, so multiply by 2^n (capped at 4x to avoid 429).
-    """
-    return min(1 << len(require_words), 4) if require_words else 1

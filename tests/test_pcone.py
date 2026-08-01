@@ -70,7 +70,9 @@ class TestPcone:
         flaky. The cheapest-first guarantee is asserted within one call below instead.
         """
         platform = PconePlatform()
-        assert len(await platform.search("咖啡", max_results=5)) <= 5
+        products = await platform.search("咖啡", max_results=5)
+        # Both bounds: a search that returned nothing would satisfy the upper one alone.
+        assert 0 < len(products) <= 5
 
     @pytest.mark.asyncio
     async def test_search_returns_price_ascending(self) -> None:

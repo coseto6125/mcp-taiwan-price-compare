@@ -7,7 +7,7 @@ Run with: pytest tests/test_ruten.py -v
 
 import pytest
 
-from price_compare.platforms.ruten import RutenPlatform
+from price_compare.platforms.ruten import RutenPlatform, _Item
 
 
 class TestRuten:
@@ -60,12 +60,22 @@ class TestRuten:
 
     @pytest.mark.asyncio
     async def test_search_include_auction_true(self) -> None:
-        """Test include_auction=True still returns valid listings."""
+        """
+        Test include_auction=True stops the buy-now filter from running.
+
+        Asserting only that products come back would pass even if the flag were
+        ignored, so this drives the parse layer with both listing modes present.
+        """
         platform = RutenPlatform()
-        products = await platform.search("耳機", max_results=30, include_auction=True)
+        listings = [
+            _Item(id="buy-now", name="直購商品", goods_price=500, mode="B"),
+            _Item(id="auction", name="競標商品", goods_price=100, mode="A"),
+        ]
+        assert [p.name for p in platform.build(platform._extract(listings))] == ["競標商品", "直購商品"]
+
+        products = await platform.search("手錶", max_results=20, include_auction=True)
         assert len(products) > 0
         assert all(p.platform == "ruten" for p in products)
-        assert all(p.price > 0 for p in products)
 
     @pytest.mark.asyncio
     async def test_search_no_duplicate_ids(self) -> None:

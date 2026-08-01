@@ -1,7 +1,9 @@
 """Base platform interface."""
 
+import heapq
 from abc import ABC, abstractmethod
 from collections.abc import Iterable
+from operator import attrgetter
 from typing import NamedTuple
 
 from price_compare.models import Product
@@ -46,6 +48,12 @@ class BasePlatform[Payload](ABC):
     # the named product. See the spread check in `build`.
     MAX_VARIANT_SPREAD = 8
 
+    # How many candidates to request, regardless of how many the caller wants back.
+    # Filtering happens after fetching, so sizing the request to max_results starves
+    # it: asking Rakuten for 20 and then applying a keyword filter returned 2 products
+    # where a full pool yields 20. Adapters that page fetch enough pages to cover this.
+    POOL_SIZE = 100
+
     async def search(
         self,
         query: str,
@@ -72,7 +80,7 @@ class BasePlatform[Payload](ABC):
             Matching products, cheapest first. Empty when the site failed or matched
             nothing; adapters never raise out of here.
         """
-        payload = await self._fetch(query, max_results, include_auction=include_auction)
+        payload = await self._fetch(query, self.POOL_SIZE, include_auction=include_auction)
         if payload is None:
             return []
         return self.build(self._extract(payload), max_results, min_price, max_price, require_words)
@@ -87,11 +95,13 @@ class BasePlatform[Payload](ABC):
     ) -> list[Product]:
         """Turn raw candidates into the products a caller asked for."""
         prepared = prepare_keyword_groups(require_words)
-        products: list[Product] = []
-        seen: set[str] = set()
+        # Keyed by id so a repeated listing keeps its cheapest entry. Sites interleave
+        # sponsored copies of the same product ahead of the plain one, so keeping
+        # whichever arrived first would let their ordering pick the price.
+        cheapest: dict[str, Product] = {}
 
         for candidate in candidates:
-            if not candidate.id or candidate.id in seen or not (name := candidate.name.strip()):
+            if not candidate.id or not (name := candidate.name.strip()):
                 continue
             if (price := parse_price(candidate.price)) is None or price <= 0:
                 continue
@@ -112,16 +122,31 @@ class BasePlatform[Payload](ABC):
             if not matches_keywords(name.lower(), prepared):
                 continue
 
-            seen.add(candidate.id)
-            products.append(Product(name=name, price=price, url=candidate.url, platform=self.name))
+            if (previous := cheapest.get(candidate.id)) is None or price < previous.price:
+                cheapest[candidate.id] = Product(name=name, price=price, url=candidate.url, platform=self.name)
 
         # Always ordered here rather than trusting a site's sort parameter. Coupang's
         # salePriceAsc and Rakuten's LowestPrice both interleave sponsored placements
         # (measured: 16 inversions and a 720/2160/740 lead-in respectively), so a
         # platform that declared itself pre-sorted would hand back an arbitrary slice
         # the moment its ranking changed. Sorting ~100 items costs microseconds.
-        products.sort(key=lambda p: p.price)
-        return products[:max_results]
+        return heapq.nsmallest(max_results, cheapest.values(), key=attrgetter("price"))
+
+    @staticmethod
+    def _page_bodies(responses: Iterable[object]) -> list[bytes] | None:
+        """
+        Return every page's body, or None if any page did not arrive.
+
+        A concurrent page fetch that quietly drops its failures looks like a complete
+        result set with a hole in it. When the missing page is the first one, what
+        comes back is not even the site's cheapest set.
+        """
+        bodies: list[bytes] = []
+        for resp in responses:
+            if isinstance(resp, BaseException) or resp.status_code != 200:  # type: ignore[attr-defined]
+                return None
+            bodies.append(resp.content)  # type: ignore[attr-defined]
+        return bodies or None
 
     @abstractmethod
     async def _fetch(self, query: str, max_results: int, *, include_auction: bool = False) -> Payload | None:
