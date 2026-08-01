@@ -19,7 +19,7 @@ def flatten(iterable: Iterable[Iterable[Any]]) -> Iterable[Any]:
         A flat iterable containing all elements
     """
     try:
-        from tkinter import _flatten  # noqa: RUF100  # type: ignore[attr-defined]
+        from tkinter import _flatten  # type: ignore[attr-defined]  # noqa: RUF100
 
         return _flatten(list(iterable))
     except ImportError:

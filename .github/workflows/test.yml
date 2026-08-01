@@ -55,14 +55,51 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        platform:
-          - pchome
-          - momo
-          - coupang
-          - etmall
-          - rakuten
-          - yahoo_shopping
-          - yahoo_auction
+        include:
+          # Platforms whose tests live in the shared tests/test_platforms.py
+          - platform: pchome
+            file: tests/test_platforms.py
+            klass: TestPChome
+          - platform: momo
+            file: tests/test_platforms.py
+            klass: TestMomo
+          - platform: coupang
+            file: tests/test_platforms.py
+            klass: TestCoupang
+          - platform: etmall
+            file: tests/test_platforms.py
+            klass: TestETMall
+          - platform: rakuten
+            file: tests/test_platforms.py
+            klass: TestRakuten
+          - platform: yahoo_shopping
+            file: tests/test_platforms.py
+            klass: TestYahooShopping
+          - platform: yahoo_auction
+            file: tests/test_platforms.py
+            klass: TestYahooAuction
+          # Platforms with a dedicated test module
+          - platform: costco
+            file: tests/test_costco.py
+            klass: TestCostco
+          - platform: pxbox
+            file: tests/test_pxbox.py
+            klass: TestPxbox
+          - platform: uniprosperity
+            file: tests/test_uniprosperity.py
+            klass: TestUniProsperity
+          - platform: books
+            file: tests/test_books.py
+            klass: TestBooks
+          - platform: ruten
+            file: tests/test_ruten.py
+            klass: TestRuten
+          - platform: buy123
+            file: tests/test_buy123.py
+            klass: TestBuy123
+          - platform: pcone
+            file: tests/test_pcone.py
+            klass: TestPcone
 
     steps:
       - uses: actions/checkout@v4
@@ -79,8 +116,6 @@ jobs:
         run: uv sync --extra dev
 
       - name: Test ${{ matrix.platform }}
-        run: |
-          uv run pytest tests/test_platforms.py -v -k "Test${PLATFORM^}" --tb=short
+        run: uv run pytest ${{ matrix.file }} -v -k ${{ matrix.klass }} --tb=short
         env:
-          PLATFORM: ${{ matrix.platform }}
           PYTHONUNBUFFERED: "1"

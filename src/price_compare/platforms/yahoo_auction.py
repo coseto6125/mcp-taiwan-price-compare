@@ -84,7 +84,10 @@ class YahooAuctionPlatform(BasePlatform):
         self._impersonate = impersonate
         self._timeout = timeout
 
-    async def search(
+    # mypy flags this as an incompatible override: the base absorbs include_auction
+    # through **kwargs, and naming it here widens the signature rather than narrowing
+    # it, which is safe at runtime but not what mypy's Liskov check accepts.
+    async def search(  # type: ignore[override]
         self,
         query: str,
         max_results: int = 100,

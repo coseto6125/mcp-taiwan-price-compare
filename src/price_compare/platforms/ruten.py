@@ -64,7 +64,10 @@ class RutenPlatform(BasePlatform):
         self._impersonate = impersonate
         self._timeout = timeout
 
-    async def search(
+    # mypy flags this as an incompatible override: the base absorbs include_auction
+    # through **kwargs, and naming it here widens the signature rather than narrowing
+    # it, which is safe at runtime but not what mypy's Liskov check accepts.
+    async def search(  # type: ignore[override]
         self,
         query: str,
         max_results: int = 100,
@@ -76,8 +79,10 @@ class RutenPlatform(BasePlatform):
     ) -> list[Product]:
         """Search products on Ruten."""
         prepared_keywords = prepare_keyword_groups(require_words)
-        limit = min(max(max_results, 1), 100)
-        params = {"q": query, "limit": str(limit)}
+        # Fixed candidate pool rather than max_results: results arrive by relevance, so a
+        # small request would be sorted and truncated from an already-narrow slice and miss
+        # the cheaper matches further down. Both round trips are ~0.04s regardless of size.
+        params = {"q": query, "limit": "100"}
         if not include_auction:
             params["type"] = "direct"
 
@@ -118,9 +123,6 @@ class RutenPlatform(BasePlatform):
         seen_ids: set[str] = set()
 
         for item in items:
-            if len(products) >= max_results:
-                break
-
             if not item.name or not item.id:
                 continue
             if not include_auction and item.mode != "B":
@@ -137,4 +139,9 @@ class RutenPlatform(BasePlatform):
             seen_ids.add(item.id)
             products.append(Product(name=item.name, price=int(price), url=f"{self._ITEM_URL}?{quote(item.id)}", platform=self.name))
 
-        return products
+        # The search runs on relevance, not price: Ruten's own price-ascending pages are
+        # almost entirely $1 filler listings, so the relevance pool is the better candidate
+        # set. Ordering it here means truncation keeps its cheapest members rather than an
+        # arbitrary relevance slice.
+        products.sort(key=lambda p: p.price)
+        return products[:max_results]
