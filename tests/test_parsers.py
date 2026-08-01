@@ -113,7 +113,8 @@ def test_parser_returns_empty_for_unrecognised_markup(platform_cls) -> None:
 
 @pytest.mark.parametrize("platform_cls", CLASSES_ONLY, ids=PARSER_IDS)
 def test_parser_keeps_names_containing_an_escaped_quote(platform_cls) -> None:
-    """Test a name holding &quot; survives instead of being cut at the embedded quote.
+    """
+    Test a name holding &quot; survives instead of being cut at the embedded quote.
 
     Unescaping the whole page before matching a quote-delimited attribute turns &quot;
     into a bare quote that closes the match early, so `SONY 27&quot;LCD` parses as `SONY 27`.

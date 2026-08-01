@@ -86,3 +86,23 @@ class TestPriceCompareService:
         products = await service.platforms["pcone"].search("咖啡", max_results=5)
         assert len(products) > 0
         assert all(p.platform == "pcone" for p in products)
+
+    @pytest.mark.asyncio
+    async def test_unknown_mode_raises_instead_of_falling_back(self) -> None:
+        """Test a mistyped mode fails loudly rather than quietly querying everything."""
+        service = PriceCompareService()
+        with pytest.raises(ValueError, match="unknown mode"):
+            await service.search_all_platforms("咖啡", max_per_platform=5, mode="FAST")
+
+    @pytest.mark.asyncio
+    async def test_aclose_releases_held_connections_and_stays_usable(self) -> None:
+        """Test closing frees the one platform holding a connection, and search still works."""
+        service = PriceCompareService()
+        await service.platforms["pcone"].search("咖啡", max_results=3)
+        assert service.platforms["pcone"]._client is not None
+
+        await service.aclose()
+        assert service.platforms["pcone"]._client is None
+
+        await service.aclose()
+        assert await service.platforms["pcone"].search("咖啡", max_results=3)

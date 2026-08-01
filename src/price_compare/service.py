@@ -3,7 +3,7 @@
 import asyncio
 import heapq
 from operator import attrgetter
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 from price_compare.models import Product, SearchResult
 from price_compare.platforms import (
@@ -23,6 +23,10 @@ from price_compare.platforms import (
     YahooShoppingPlatform,
 )
 from price_compare.utils import KeywordGroups, flatten
+
+# Which platforms a multi-platform fan-out covers. Mirrored as a Literal in mcp_server.
+type SearchMode = Literal["full", "fast"]
+MODES: frozenset[str] = frozenset({"full", "fast"})
 
 if TYPE_CHECKING:
     from price_compare.platforms.base import BasePlatform
@@ -74,7 +78,7 @@ class PriceCompareService:
         max_price: int = 0,
         require_words: KeywordGroups = None,
         include_auction: bool = False,
-        mode: str = "full",
+        mode: SearchMode = "full",
     ) -> SearchResult:
         """
         Search across platforms concurrently.
@@ -92,11 +96,27 @@ class PriceCompareService:
         products = list(flatten(r for r in results if isinstance(r, list)))
         return SearchResult(query=query, products=products, total_count=len(products))
 
-    def _select(self, mode: str) -> list["BasePlatform"]:
-        """Return the platforms a fan-out in this mode should query."""
+    def _select(self, mode: SearchMode) -> list["BasePlatform"]:
+        """
+        Return the platforms a fan-out in this mode should query.
+
+        Raises:
+            ValueError: The mode is not one of MODES. A typo would otherwise fall through
+                to the full set and quietly cost seconds per call.
+        """
+        if mode not in MODES:
+            msg = f"unknown mode {mode!r}, expected one of {sorted(MODES)}"
+            raise ValueError(msg)
         if mode == "fast":
             return [p for name, p in self.platforms.items() if name in self.FAST_PLATFORMS]
         return list(self.platforms.values())
+
+    async def aclose(self) -> None:
+        """Release any connection a platform is holding open across searches."""
+        for platform in self.platforms.values():
+            closer = getattr(platform, "aclose", None)
+            if closer is not None:
+                await closer()
 
     async def get_cheapest(
         self,
@@ -108,7 +128,7 @@ class PriceCompareService:
         descending: bool = False,
         require_words: KeywordGroups = None,
         include_auction: bool = False,
-        mode: str = "full",
+        mode: SearchMode = "full",
     ) -> list[Product]:
         """Get top N products sorted by price. Uses heapq for O(n log k)."""
         result = await self.search_all_platforms(

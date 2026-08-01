@@ -57,6 +57,12 @@ class PconePlatform(BasePlatform):
             )
         return self._client
 
+    async def aclose(self) -> None:
+        """Close the reused connection. Idempotent, and a later search reopens one."""
+        if self._client is not None:
+            client, self._client = self._client, None
+            await client.__aexit__(None, None, None)
+
     async def search(
         self,
         query: str,

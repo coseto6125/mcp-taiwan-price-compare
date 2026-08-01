@@ -7,7 +7,7 @@ from fastmcp import FastMCP
 from msgspec import structs
 
 from price_compare.models import Product
-from price_compare.service import PriceCompareService
+from price_compare.service import PriceCompareService, SearchMode
 
 
 def _to_toon(products: list[Product]) -> str:
@@ -19,7 +19,6 @@ mcp = FastMCP(name="price-compare")
 service = PriceCompareService()
 
 # Valid platform names
-SearchMode = Literal["full", "fast"]
 PlatformName = Literal[
     "pchome", "momo", "coupang", "etmall", "rakuten", "yahoo_shopping", "yahoo_auction", "costco", "pxbox", "uniprosperity", "books", "ruten", "buy123", "pcone"
 ]

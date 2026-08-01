@@ -1,5 +1,6 @@
 """Ruten (露天市集) platform implementation."""
 
+import asyncio
 from contextlib import suppress
 from typing import TYPE_CHECKING
 from urllib.parse import quote
@@ -55,6 +56,8 @@ class RutenPlatform(BasePlatform):
     _SEARCH_URL = "https://rtapi.ruten.com.tw/api/search/v3/index.php/core/prod"
     _ITEMS_URL = "https://rapi.ruten.com.tw/api/items/v2/list"
     _ITEM_URL = "https://www.ruten.com.tw/item/show"
+    _ITEM_ATTEMPTS = 3
+    _RETRY_DELAY = 0.3
 
     def __init__(
         self,
@@ -101,9 +104,16 @@ class RutenPlatform(BasePlatform):
                 if not ids:
                     return []
 
-                items_resp = await client.get(self._ITEMS_URL, params={"gno": ",".join(ids)})
-                if items_resp.status_code != 200:
-                    return []
+                # The batch item endpoint intermittently answers 502/503 and succeeds on a
+                # retry moments later, independent of how many ids the batch carries.
+                params_items = {"gno": ",".join(ids)}
+                for attempt in range(self._ITEM_ATTEMPTS):
+                    items_resp = await client.get(self._ITEMS_URL, params=params_items)
+                    if items_resp.status_code == 200:
+                        break
+                    if attempt + 1 == self._ITEM_ATTEMPTS:
+                        return []
+                    await asyncio.sleep(self._RETRY_DELAY)
 
                 items = _items_decoder.decode(items_resp.content).data
                 return self._parse_items(items, max_results, min_price, max_price, include_auction, prepared_keywords)

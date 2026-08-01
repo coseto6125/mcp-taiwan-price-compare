@@ -75,3 +75,32 @@ class TestRuten:
         urls = [p.url for p in products]
         assert len(urls) > 0
         assert len(urls) == len(set(urls))
+
+    @pytest.mark.asyncio
+    async def test_search_returns_price_ascending(self) -> None:
+        """
+        Test results arrive cheapest-first.
+
+        Ruten is searched on relevance because its own price-ascending pages are almost
+        entirely $1 filler, so the adapter orders the relevance pool itself.
+        """
+        platform = RutenPlatform()
+        products = await platform.search("咖啡", max_results=50)
+        assert len(products) > 1
+        assert [p.price for p in products] == sorted(p.price for p in products)
+
+    @pytest.mark.asyncio
+    async def test_search_keeps_the_cheapest_when_truncating(self) -> None:
+        """
+        Test a small max_results returns the pool's cheapest, not its first N.
+
+        Regression guard: max_results used to size the API request and break the parse
+        loop early, so search("咖啡", 5) returned relevance-ordered items while cheaper
+        ones sat further down the same pool.
+        """
+        platform = RutenPlatform()
+        pool = await platform.search("咖啡", max_results=100)
+        assert len(pool) > 5
+
+        cheapest = sorted(p.price for p in pool)[:5]
+        assert sorted(p.price for p in await platform.search("咖啡", max_results=5)) == cheapest

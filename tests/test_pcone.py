@@ -59,3 +59,23 @@ class TestPcone:
         assert len(products) > 0
         urls = [p.url for p in products]
         assert len(urls) == len(set(urls))
+
+    @pytest.mark.asyncio
+    async def test_search_truncates_to_max_results(self) -> None:
+        """
+        Test max_results bounds the result count.
+
+        The API returns a seed-randomised sample rather than a stable ranking, so two
+        calls draw different pools and a cheapest-set comparison across them would be
+        flaky. The cheapest-first guarantee is asserted within one call below instead.
+        """
+        platform = PconePlatform()
+        assert len(await platform.search("咖啡", max_results=5)) <= 5
+
+    @pytest.mark.asyncio
+    async def test_search_returns_price_ascending(self) -> None:
+        """Test results arrive cheapest-first."""
+        platform = PconePlatform()
+        products = await platform.search("咖啡", max_results=30)
+        assert len(products) > 1
+        assert [p.price for p in products] == sorted(p.price for p in products)

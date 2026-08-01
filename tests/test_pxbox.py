@@ -7,7 +7,7 @@ Run with: pytest tests/test_pxbox.py -v
 
 import pytest
 
-from price_compare.platforms.pxbox import PxboxPlatform
+from price_compare.platforms.pxbox import PxboxPlatform, _PxboxProduct
 
 
 class TestPxbox:
@@ -64,3 +64,38 @@ class TestPxbox:
         assert len(products) > 0
         for p in products:
             assert "咖啡" in p.name
+
+    @pytest.mark.asyncio
+    async def test_search_keeps_the_cheapest_when_truncating(self) -> None:
+        """
+        Test a small max_results returns the cheapest of the candidate pool.
+
+        The adapter fetches a fixed 100-item pool and relies on the API's price-ascending
+        sort, so truncation must not hand back an arbitrary slice.
+        """
+        platform = PxboxPlatform()
+        pool = await platform.search("餅乾", max_results=50)
+        assert len(pool) > 5
+
+        cheapest = sorted(p.price for p in pool)[:5]
+        assert sorted(p.price for p in await platform.search("餅乾", max_results=5)) == cheapest
+
+
+def test_parse_products_drops_sold_out_and_ad_entries() -> None:
+    """
+    Test sold-out listings and ad placements never reach the caller.
+
+    Neither flag survives onto Product, so this drives the parser directly rather than
+    asserting on a live result set that cannot show what was filtered.
+    """
+    items = [
+        _PxboxProduct(id=1, product_name="在架商品", sale_price=50),
+        _PxboxProduct(id=2, product_name="售罄商品", sale_price=10, is_sold_out=True),
+        _PxboxProduct(id=3, product_name="廣告商品", sale_price=20, is_ad=True),
+        _PxboxProduct(id=4, product_name="零元商品", sale_price=0),
+        _PxboxProduct(id=5, product_name="重複 id", sale_price=60),
+        _PxboxProduct(id=5, product_name="重複 id 第二筆", sale_price=70),
+    ]
+    products = PxboxPlatform()._parse_products(items, 100, 0, 0, None)
+
+    assert [p.name for p in products] == ["在架商品", "重複 id"]
