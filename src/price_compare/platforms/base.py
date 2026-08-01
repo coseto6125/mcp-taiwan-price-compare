@@ -20,6 +20,9 @@ class Candidate(NamedTuple):
     name: str
     price: object
     url: str
+    # Set only when the site reports a price range for the listing. Then `price` is the
+    # floor across variants, not what the named product costs - see the pipeline.
+    price_max: object = None
 
 
 class BasePlatform[Payload](ABC):
@@ -87,6 +90,13 @@ class BasePlatform[Payload](ABC):
             if not candidate.id or candidate.id in seen or not (name := candidate.name.strip()):
                 continue
             if (price := parse_price(candidate.price)) is None or price <= 0:
+                continue
+            # A listing the site prices as a range has no single comparable price: its
+            # floor belongs to the cheapest variant, not to the product the name
+            # describes. Rakuten quotes a coffee-cup listing at $1 when the 50-pack it
+            # is named for costs $140, and Yahoo Auction does the same. Both would
+            # otherwise fill the cheapest-N with items nobody searched for.
+            if (ceiling := parse_price(candidate.price_max)) is not None and ceiling != price:
                 continue
             if (min_price and price < min_price) or (max_price and price > max_price):
                 continue

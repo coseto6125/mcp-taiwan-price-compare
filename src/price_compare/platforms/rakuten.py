@@ -20,7 +20,7 @@ query fetchSearchPageResults($parameters: GspInputType!) {
         itemId
         itemName
         itemUrl
-        itemPrice { min }
+        itemPrice { min max }
       }
     }
   }
@@ -88,4 +88,5 @@ class RakutenPlatform(BasePlatform[list[dict]]):
             item_id, name, url = item.get("itemId"), item.get("itemName"), item.get("itemUrl")
             if not (item_id and name and url):
                 continue
-            yield Candidate(id=str(item_id), name=name, price=(item.get("itemPrice") or {}).get("min"), url=url)
+            price = item.get("itemPrice") or {}
+            yield Candidate(id=str(item_id), name=name, price=price.get("min"), url=url, price_max=price.get("max"))

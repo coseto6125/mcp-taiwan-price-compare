@@ -44,6 +44,9 @@ class PChomePlatform(BasePlatform[list[bytes]]):
     # fetched concurrently and concatenated, so the pipeline orders the result.
     _BASE_URL = "https://ecshweb.pchome.com.tw/search/v3.3/all/results"
     _PRODUCT_URL = "https://24h.pchome.com.tw/prod/{}"
+    # PChome marks add-on items with this prefix and exposes no field for them. They
+    # cannot be bought on their own, so their price is not one a shopper can pay.
+    _ADD_ON_MARKER = "【加價購】"
     _PAGE_SIZE = 20
     _MAX_PAGES = 5
 
@@ -85,6 +88,8 @@ class PChomePlatform(BasePlatform[list[bytes]]):
         for body in payload:
             with suppress(msgspec.DecodeError):
                 for item in _decoder.decode(body).prods:
+                    if self._ADD_ON_MARKER in item.name:
+                        continue
                     yield Candidate(
                         id=item.Id,
                         name=item.name,

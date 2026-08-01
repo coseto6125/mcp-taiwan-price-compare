@@ -28,6 +28,7 @@ class _YahooProduct(msgspec.Struct):
     ec_price: float = 0.0
     ec_item_url: str = ""
     ec_productid: str = ""
+    ec_max_price: str = ""
 
 
 class _GetUther(msgspec.Struct):
@@ -151,4 +152,10 @@ class YahooShoppingPlatform(BasePlatform[list]):
         for item in payload:
             if not item.ec_item_url:
                 continue
-            yield Candidate(id=item.ec_productid, name=item.ec_title, price=item.ec_price, url=item.ec_item_url)
+            yield Candidate(
+                id=item.ec_productid,
+                name=item.ec_title,
+                price=item.ec_price,
+                url=item.ec_item_url,
+                price_max=item.ec_max_price or None,
+            )

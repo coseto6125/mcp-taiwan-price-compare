@@ -1,5 +1,6 @@
 """Yahoo Auction (Yahoo拍賣) platform implementation."""
 
+import re
 from collections.abc import Iterator
 from contextlib import suppress
 from typing import TYPE_CHECKING
@@ -17,6 +18,19 @@ from price_compare.platforms.base import BasePlatform, Candidate
 _GRAPHQL_HASH = "9e8c95a7bd216439855a6dcb580387b180713a20260a89c26096fbe4dd30133f"
 
 # HTML fallback markers
+# Listing kinds that are not a product offered at the stated price. This is a C2C
+# marketplace, so alongside goods it carries wanted ads (the buyer is the one posting),
+# repair and custom-order services, gift-with-purchase entries, and auctions baiting
+# with a $1 buy-now. None are comparable against a retail price, and the site exposes
+# no field for them - the seller's own wording is the only signal.
+_NON_RETAIL_MARKERS = re.compile(
+    r"【徵】|徵求|徵收|收購"  # wanted ads
+    r"|維修|換電池|修理"  # repair services
+    r"|客製化|訂做|訂製|報價|意者[請可]?私"  # made-to-order and quote-on-request
+    r"|[1一]元起|起標"  # auctions baiting with a $1 buy-now
+    r"|滿\d+.{0,4}[贈送]|隨選贈|加購價"  # gift-with-purchase and add-on entries
+)
+
 _ISOREDUX_START = b'<script id="isoredux-data" type="mime/invalid">'
 _ISOREDUX_END = b"</script>"
 
@@ -29,6 +43,7 @@ class _YahooAuctionProduct(msgspec.Struct):
     ec_buyprice: float = 0.0
     ec_item_url: str = ""
     ec_productid: str = ""
+    ec_max_price: str = ""
 
 
 class _GetUther(msgspec.Struct):
@@ -166,7 +181,7 @@ class YahooAuctionPlatform(BasePlatform[tuple[list, bool]]):
         """
         hits, buy_now_only = payload
         for item in hits:
-            if not item.ec_item_url:
+            if not item.ec_item_url or _NON_RETAIL_MARKERS.search(item.ec_title):
                 continue
             if buy_now_only:
                 if item.ec_buyprice <= 0:
@@ -177,4 +192,4 @@ class YahooAuctionPlatform(BasePlatform[tuple[list, bool]]):
 
             # Some hits carry a site-relative path instead of an absolute URL.
             url = item.ec_item_url if item.ec_item_url.startswith("http") else f"{self._SITE_URL}{item.ec_item_url}"
-            yield Candidate(id=item.ec_productid, name=item.ec_title, price=price, url=url)
+            yield Candidate(id=item.ec_productid, name=item.ec_title, price=price, url=url, price_max=item.ec_max_price or None)

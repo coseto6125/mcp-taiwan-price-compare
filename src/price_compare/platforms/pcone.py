@@ -59,10 +59,18 @@ class PconePlatform(BasePlatform[list[dict]]):
         return self._client
 
     async def aclose(self) -> None:
-        """Close the reused connection. Idempotent, and a later search reopens one."""
+        """
+        Close the reused connection. Idempotent, and a later search reopens one.
+
+        Best-effort: primp runs each request on a worker thread, so a request this
+        client was cancelled out of by a caller's timeout can still hold the underlying
+        handle. The reference is dropped either way and the handle is freed when that
+        thread finishes.
+        """
         if self._client is not None:
             client, self._client = self._client, None
-            await client.__aexit__(None, None, None)
+            with suppress(Exception):
+                await client.close()
 
     async def _fetch(self, query: str, max_results: int, *, include_auction: bool = False) -> list[dict] | None:
         """Request the search API and return its product entries."""

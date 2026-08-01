@@ -107,7 +107,7 @@ COMPREHENSION_TEST_CASES = [
 class TestMCPComprehension:
     """Test that simplified docs are still comprehensible."""
 
-    @pytest.mark.parametrize("user_request,expected_tool,expected_params", COMPREHENSION_TEST_CASES)
+    @pytest.mark.parametrize(("user_request", "expected_tool", "expected_params"), COMPREHENSION_TEST_CASES)
     def test_tool_selection(self, user_request: str, expected_tool: str, expected_params: dict) -> None:
         """
         Verify expected tool and params for each user scenario.

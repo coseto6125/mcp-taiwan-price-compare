@@ -12,13 +12,17 @@ site's markup changes on purpose - a diff there is the record of what changed.
 
 import pathlib
 
+import msgspec
 import pytest
 
 from price_compare.models import Product
 from price_compare.platforms.base import Candidate
 from price_compare.platforms.books import BooksPlatform
 from price_compare.platforms.coupang import CoupangPlatform
+from price_compare.platforms.pchome import PChomePlatform
+from price_compare.platforms.rakuten import RakutenPlatform
 from price_compare.platforms.uniprosperity import UniProsperityPlatform
+from price_compare.platforms.yahoo_auction import YahooAuctionPlatform, _YahooAuctionProduct
 from price_compare.service import PriceCompareService
 
 FIXTURES = pathlib.Path(__file__).parent / "fixtures"
@@ -171,3 +175,65 @@ def test_pipeline_orders_cheapest_first_regardless_of_input_order() -> None:
     ]
     products = CoupangPlatform().build(iter(sponsored_first))
     assert [p.price for p in products] == [1, 1, 1, 720, 740, 1080, 2160]
+
+
+def test_pipeline_drops_listings_priced_as_a_range() -> None:
+    """
+    Test a range-priced listing is dropped rather than quoted at its floor.
+
+    Rakuten and both Yahoo properties report a min and a max for multi-variant
+    listings. Quoting the floor put a $1 single coffee cup ahead of every real product
+    when the listing it came from is named for a $140 fifty-pack.
+    """
+    platform = RakutenPlatform()
+    candidates = [
+        Candidate(id="single", name="單一規格", price=120, url="https://example.test/a", price_max=120),
+        Candidate(id="no-max", name="未回報上限", price=130, url="https://example.test/b"),
+        Candidate(id="range", name="多規格賣場", price=1, url="https://example.test/c", price_max=140),
+    ]
+    assert [p.name for p in platform.build(iter(candidates))] == ["單一規格", "未回報上限"]
+
+
+def test_pchome_drops_add_on_only_items() -> None:
+    """Test 加價購 entries are skipped: they cannot be bought on their own."""
+    platform = PChomePlatform()
+    body = msgspec.json.encode(
+        {
+            "prods": [
+                {"Id": "A", "name": "【加價購】 膠囊回收袋", "price": 1},
+                {"Id": "B", "name": "濾掛咖啡 10入", "price": 199},
+            ]
+        }
+    )
+    assert [c.name for c in platform._extract([body])] == ["濾掛咖啡 10入"]
+
+
+@pytest.mark.parametrize(
+    "title",
+    [
+        "【徵】 Fiio RC-BT 藍牙耳機線",
+        "藍牙耳機 維修 換電池,1~3個月",
+        "深咖啡個性秋冬款襯衫一元起運費可合併",
+        "愛呀！莉奈♥賣場商品滿699隨選贈一 AirPods保護套",
+        "浴櫃鏡櫃皆可量身訂做1公分35元",
+    ],
+)
+def test_yahoo_auction_drops_non_retail_listings(title: str) -> None:
+    """
+    Test wanted ads, services, auction bait, and gift entries never reach a caller.
+
+    Each of these was in the cheapest ten for a real query. None is a product offered
+    at the price shown, and the site exposes no field marking them.
+    """
+    platform = YahooAuctionPlatform()
+    hit = _YahooAuctionProduct(ec_title=title, ec_buyprice=1.0, ec_item_url="https://tw.bid.yahoo.com/item/1", ec_productid="1")
+    assert list(platform._extract(([hit], True))) == []
+
+
+def test_yahoo_auction_keeps_ordinary_listings() -> None:
+    """Test the non-retail markers do not swallow a normal product."""
+    platform = YahooAuctionPlatform()
+    hit = _YahooAuctionProduct(
+        ec_title="SONY WF-1000XM5 真無線藍牙耳機", ec_buyprice=6990.0, ec_item_url="https://tw.bid.yahoo.com/item/2", ec_productid="2"
+    )
+    assert [c.name for c in platform._extract(([hit], True))] == ["SONY WF-1000XM5 真無線藍牙耳機"]
