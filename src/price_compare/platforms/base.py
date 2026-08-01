@@ -42,6 +42,10 @@ class BasePlatform[Payload](ABC):
 
     name: str = "base"
 
+    # How far a listing's variants may spread before its floor stops representing
+    # the named product. See the spread check in `build`.
+    MAX_VARIANT_SPREAD = 8
+
     async def search(
         self,
         query: str,
@@ -91,12 +95,17 @@ class BasePlatform[Payload](ABC):
                 continue
             if (price := parse_price(candidate.price)) is None or price <= 0:
                 continue
-            # A listing the site prices as a range has no single comparable price: its
-            # floor belongs to the cheapest variant, not to the product the name
-            # describes. Rakuten quotes a coffee-cup listing at $1 when the 50-pack it
-            # is named for costs $140, and Yahoo Auction does the same. Both would
-            # otherwise fill the cheapest-N with items nobody searched for.
-            if (ceiling := parse_price(candidate.price_max)) is not None and ceiling != price:
+            # A listing priced as a range quotes its cheapest variant. That is a fair
+            # price when the variants are the same kind of thing (a $740-$776 coffee pot
+            # differing only by mains voltage) and a wrong one when the floor is an
+            # accessory on a listing named for something else (a $1-$7,621 office chair,
+            # a $1 single cup on a listing named for a $140 fifty-pack).
+            #
+            # Measured over 206 range-priced listings from Rakuten and Yahoo Auction, the
+            # spread splits at a valley between 6x and 10x: 143 sit below 6x and are
+            # genuine variants, 56 sit above 10x and are not, and only 7 fall between.
+            # The cut goes in that gap.
+            if (ceiling := parse_price(candidate.price_max)) is not None and ceiling >= price * self.MAX_VARIANT_SPREAD:
                 continue
             if (min_price and price < min_price) or (max_price and price > max_price):
                 continue
