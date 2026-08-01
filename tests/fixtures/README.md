@@ -13,6 +13,28 @@
 | `books_search.html` | books | 6 |
 | `uniprosperity_search.html` | uniprosperity | 8 |
 
+## `*_payload.json` — 其餘 11 個平台
+
+HTML 以外的平台，`_fetch` 回傳的是解碼後的結構而非原始位元組，形狀各站不同
+（`list[dict]`、`list[Struct]`、`list[bytes]`、`tuple[hits, buy_now_only]`）。這些檔案存的是
+該結構序列化後的 JSON，`tests/test_parsers.py` 的 `PAYLOAD_LOADERS` 負責載回原形。
+
+`tests/test_parsers.py` 的 `EXPECTED` 表釘住每個 fixture 應解析出幾筆、通過管線後剩幾筆。
+改動 fixture 就要同步更新該表 — 那個表是「parser 沒死掉但退化成只回一筆」這類問題唯一
+抓得到的地方。
+
+Costco 的 fixture 刻意混入 2 筆無標價的賣場現場品項，用來驗證管線會丟棄它們；重抓後
+若這個比例變了，`EXPECTED["costco"]` 要跟著改。
+
+重抓執行 `tests/fixtures/regenerate.py`：
+
+```bash
+.venv/bin/python tests/fixtures/regenerate.py
+```
+
+該腳本會重抓全部 14 個 fixture（3 個 HTML 加 11 個 JSON payload）並印出各自的解析筆數，
+把印出的數字對回 `EXPECTED`。
+
 ## 什麼時候該重抓
 
 站台改版、你更新了解析器，**而且**已經確認線上真的變了 — 這時重抓。fixture 的 diff
@@ -20,43 +42,4 @@
 
 解析測試紅了但線上沒變，那是真的回歸，改解析器而不是改 fixture。
 
-## 怎麼重抓
 
-```bash
-.venv/bin/python - <<'PY'
-import asyncio, pathlib
-from urllib.parse import quote
-import never_primp as primp
-
-OUT = pathlib.Path("tests/fixtures")
-SOURCES = [
-    ("coupang_search.html",
-     "https://www.tw.coupang.com/np/search?q={q}&sorter=salePriceAsc&listSize=60",
-     '<li class="ProductUnit_productUnit__', 6),
-    ("books_search.html",
-     "https://search.books.com.tw/search/query/cat/all/sort/8/key/{q}",
-     '<div class="table-td" id="prod-itemlist-', 6),
-    ("uniprosperity_search.html",
-     "https://online.uni-prosperity.com.tw/on/demandware.store/"
-     "Sites-Uniprosperity-Site/default/Search-UpdateGrid?q=q%3D{q}",
-     '<a class="gtm-product-alink"', 8),
-]
-
-async def main():
-    q = quote("咖啡")
-    async with primp.AsyncClient(impersonate="chrome_142", impersonate_os="windows",
-                                 timeout=30.0, follow_redirects=True) as c:
-        for name, url, delimiter, keep in SOURCES:
-            body = (await c.get(url.format(q=q))).text
-            parts = body.split(delimiter)
-            trimmed = parts[0][-2000:] + delimiter + delimiter.join(parts[1 : keep + 1])
-            (OUT / name).write_text(trimmed, encoding="utf-8")
-            print(f"{name}: {len(parts) - 1} 個區塊，保留 {keep}")
-
-asyncio.run(main())
-PY
-```
-
-保留的商品數若有變動，同步更新 `tests/test_parsers.py` 的 `PARSERS` 表。
-
-博客來對密集請求會直接 reset 連線，重抓失敗的話隔幾分鐘再試。

@@ -20,18 +20,21 @@ _GRAPHQL_HASH = "9e8c95a7bd216439855a6dcb580387b180713a20260a89c26096fbe4dd30133
 # HTML fallback markers
 # Listing kinds that are not a product offered at the stated price. This is a C2C
 # marketplace, so alongside goods it carries wanted ads (the buyer is the one posting),
-# deposit-only entries, rentals, and placeholders. The site exposes no field for any of
-# them, so the seller's own wording is the only signal.
+# placeholders and auctions baiting with a $1 buy-now. The site exposes no field for
+# any of them, so the seller's own wording is the only signal.
 #
-# These have to be transaction-intent phrases, not topic words. An earlier version
-# matched bare 維修 / 訂製 / 客製化 / 收購 and threw away 49 of 60 results for
-# "維修工具" and 21 for "訂製 印章" - real goods sold at the price shown, whose titles
-# merely name what they are for.
+# Every marker here has to be a phrase that only a non-retail listing would use.
+# Two earlier attempts were too broad and each was measured against live listings:
+#   - bare 維修 / 訂製 / 客製化 / 收購 threw away 49 of 60 results for "維修工具" and
+#     21 for "訂製 印章" - goods whose titles merely name what they are for.
+#   - 徵求 / 出租 / 下標專區 / 運費專區 / 補差價 caught a curtain shop recruiting
+#     advertising participants (徵求廣告戶), a shoebox for rented rooms (出租屋), a
+#     free-shipping promotion (免運費專區) and a steel rack sold through a
+#     訂製下標專區. Sellers use those words for ordinary goods.
 _NON_RETAIL_MARKERS = re.compile(
-    r"求購|徵求|收購中|高價收|【徵】"  # the poster is buying, not selling
-    r"|請勿下標|勿下標|測試商品|下標前[請先]"  # placeholders and do-not-buy notices
-    r"|訂金專[區場]|訂金及|下標專區|補差價|運費專[區用]"  # deposits and top-up entries
-    r"|出租|租借|日租|月租"  # rentals
+    r"【徵】|求購|收購中|高價收"  # the poster is buying, not selling
+    r"|請勿下標|勿下標|測試商品"  # placeholders and do-not-buy notices
+    r"|訂金專[區場]"  # deposit-only entries
     r"|[1一]元起標|起標價"  # auctions baiting with a $1 buy-now
     r"|隨選贈|滿額贈"  # gift-with-purchase entries
 )

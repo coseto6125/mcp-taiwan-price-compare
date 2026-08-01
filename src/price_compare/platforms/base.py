@@ -8,7 +8,7 @@ from operator import attrgetter
 from typing import NamedTuple
 
 from price_compare.models import Product
-from price_compare.utils import KeywordGroups, matches_keywords, parse_price, prepare_keyword_groups
+from price_compare.utils import KeywordGroups, calc_search_multiplier, matches_keywords, parse_price, prepare_keyword_groups
 
 
 class Candidate(NamedTuple):
@@ -55,6 +55,10 @@ class BasePlatform[Payload](ABC):
     # where a full pool yields 20. Adapters that page fetch enough pages to cover this.
     POOL_SIZE = 100
 
+    # Ceiling for the widened pool a keyword filter asks for. Past this the extra
+    # pages cost more than the matches they turn up.
+    MAX_POOL_SIZE = 200
+
     # Paged adapters retry individual pages rather than discarding the whole set.
     PAGE_ATTEMPTS = 3
     PAGE_RETRY_DELAY = 0.3
@@ -85,7 +89,7 @@ class BasePlatform[Payload](ABC):
             Matching products, cheapest first. Empty when the site failed or matched
             nothing; adapters never raise out of here.
         """
-        payload = await self._fetch(query, self.POOL_SIZE, include_auction=include_auction)
+        payload = await self._fetch(query, self._pool_for(require_words), include_auction=include_auction)
         if payload is None:
             return []
         return self.build(self._extract(payload), max_results, min_price, max_price, require_words)
@@ -136,6 +140,16 @@ class BasePlatform[Payload](ABC):
         # platform that declared itself pre-sorted would hand back an arbitrary slice
         # the moment its ranking changed. Sorting ~100 items costs microseconds.
         return heapq.nsmallest(max_results, cheapest.values(), key=attrgetter("price"))
+
+    def _pool_for(self, require_words: KeywordGroups) -> int:
+        """
+        How many candidates to request for a search with these filters.
+
+        Each AND group roughly halves the pass rate, so a keyword filter needs a wider
+        pool to still leave max_results behind. Adapters that page turn this into more
+        pages; the ones that fetch a fixed page ignore anything above their own cap.
+        """
+        return min(self.POOL_SIZE * calc_search_multiplier(require_words), self.MAX_POOL_SIZE)
 
     async def _fetch_pages(self, client: object, urls: list[str]) -> list[bytes] | None:
         """

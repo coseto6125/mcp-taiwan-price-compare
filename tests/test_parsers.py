@@ -221,8 +221,6 @@ def test_pchome_drops_add_on_only_items() -> None:
         "求購75年76年蔣公拾元硬幣，一枚100元收",
         "已賣出請勿下標 牛仔褲短褲",
         "【小白代購-預購訂金專場】旅美球員卡代購",
-        "【訂金、運費、板費、製稿費】下標專區",
-        "[現貨出租] 馬力歐互動手環",
         "工業風小銼刀×5 職人工具 1元起標",
         "愛呀！莉奈♥賣場商品隨選贈一 AirPods保護套",
     ],
@@ -247,6 +245,11 @@ def test_yahoo_auction_drops_non_retail_listings(title: str) -> None:
         "客製化大頭照印章",  # 客製化 describes the product, not the transaction
         "2x5cm 宣傳章・訂製印章",
         "手機螢幕維修膠 現貨",
+        "AP1314 木紋貼紙 套房出租-房東整修",  # 出租 describes where the wallpaper goes
+        "透明鞋盒出租屋家用小型收納盒",
+        "寒山香喉無糖潤喉錠（買10送2免運費專區）",  # 免運費專區 is a promotion
+        "【空間特工】純304不鏽鋼台架【訂製下標專區】",  # sellers list real goods this way
+        "尊典窗簾布 新成屋優惠-徵求廣告戶~現省5000",  # 徵求 recruits customers, not goods
     ],
 )
 def test_yahoo_auction_keeps_ordinary_listings(title: str) -> None:
@@ -285,6 +288,24 @@ PAYLOAD_LOADERS = {
 }
 
 
+# How many candidates each saved response holds, and how many survive the pipeline.
+# Pinning the counts is what makes these tests fail when a parser degrades rather than
+# dies: without them, a parser cut down to a single candidate still passed.
+EXPECTED = {
+    "costco": (8, 6),  # two in-warehouse entries carry no price and the pipeline drops them
+    "buy123": (6, 6),
+    "pcone": (6, 6),
+    "rakuten": (6, 6),
+    "momo": (19, 19),
+    "pxbox": (5, 5),
+    "ruten": (6, 6),
+    "yahoo_shopping": (6, 6),
+    "etmall": (40, 40),
+    "pchome": (19, 19),
+    "yahoo_auction": (4, 4),
+}
+
+
 def load_payload(name: str):
     """Load an adapter's saved response in the shape its `_extract` expects."""
     return PAYLOAD_LOADERS[name]((FIXTURES / f"{name}_payload.json").read_bytes())
@@ -296,7 +317,10 @@ def test_adapter_extracts_candidates_from_its_own_saved_response(name: str) -> N
     platform = PriceCompareService().platforms[name]
     candidates = list(platform._extract(load_payload(name)))
 
-    assert candidates, f"{name} extracted nothing from its saved response"
+    assert len(candidates) == EXPECTED[name][0], (
+        f"{name} read {len(candidates)} candidates from its saved response, expected "
+        f"{EXPECTED[name][0]} - a parser that lost most of a page would otherwise pass"
+    )
     assert all(c.id for c in candidates), name
     assert all(c.name.strip() for c in candidates), name
     assert all(c.url.startswith("https://") for c in candidates), name
@@ -310,12 +334,15 @@ def test_adapter_extracts_candidates_from_its_own_saved_response(name: str) -> N
 def test_adapter_pipeline_produces_products_from_its_own_saved_response(name: str) -> None:
     """Test the whole offline path, extract through build, for every adapter."""
     platform = PriceCompareService().platforms[name]
-    products = platform.build(platform._extract(load_payload(name)), max_results=3)
+    everything = platform.build(platform._extract(load_payload(name)))
+    assert len(everything) == EXPECTED[name][1], name
 
-    assert products, name
-    assert len(products) <= 3, name
+    products = platform.build(platform._extract(load_payload(name)), max_results=3)
+    assert len(products) == min(3, EXPECTED[name][1]), name
     assert [p.price for p in products] == sorted(p.price for p in products), name
     assert all(p.platform == name for p in products), name
+    # Truncation keeps the cheapest, not the first three the site listed.
+    assert [p.price for p in products] == sorted(p.price for p in everything)[:3], name
 
 
 class _FlakyClient:
@@ -368,3 +395,21 @@ async def test_paged_fetch_gives_up_rather_than_returning_a_hole() -> None:
     client = _FlakyClient(fail_first=set(), fail_always={0})
 
     assert await platform._fetch_pages(client, [f"https://example.test/?p={i}" for i in range(3)]) is None
+
+
+def test_variant_spread_cut_sits_where_the_measured_distribution_splits() -> None:
+    """
+    Test the threshold keeps genuine variants and drops accessory floors.
+
+    Over 206 range-priced listings the spread had a valley between 6x and 10x. These
+    bracket it, so changing MAX_VARIANT_SPREAD has to be a deliberate decision rather
+    than something a later edit can do silently.
+    """
+    platform = RakutenPlatform()
+
+    def kept(spread: int) -> bool:
+        candidate = Candidate(id="x", name="賣場", price=100, url="https://example.test/x", price_max=100 * spread)
+        return bool(platform.build(iter([candidate])))
+
+    assert kept(6), "6x is a genuine variant spread and must survive"
+    assert not kept(10), "10x is an accessory floor and must be dropped"

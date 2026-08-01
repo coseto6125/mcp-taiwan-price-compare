@@ -5,6 +5,10 @@ These tests make real API calls to verify the adapter works.
 Run with: pytest tests/test_ruten.py -v
 """
 
+from unittest import mock
+
+import msgspec
+import never_primp as primp
 import pytest
 
 from price_compare.platforms.ruten import RutenPlatform, _Item
@@ -59,20 +63,50 @@ class TestRuten:
         assert all(p.price > 0 for p in products)
 
     @pytest.mark.asyncio
-    async def test_search_include_auction_true(self) -> None:
+    async def test_include_auction_drives_both_the_request_and_the_mode_filter(self) -> None:
         """
-        Test include_auction=True stops the buy-now filter from running.
+        Test the flag reaches the request params and the post-decode mode filter.
 
-        Asserting only that products come back would pass even if the flag were
-        ignored, so this drives the parse layer with both listing modes present.
+        Asserting only that products come back passes even when the flag is ignored
+        outright, so this records what _fetch actually asked the site for and what it
+        kept from the response.
         """
         platform = RutenPlatform()
         listings = [
             _Item(id="buy-now", name="直購商品", goods_price=500, mode="B"),
             _Item(id="auction", name="競標商品", goods_price=100, mode="A"),
         ]
-        assert [p.name for p in platform.build(platform._extract(listings))] == ["競標商品", "直購商品"]
+        asked: list[dict] = []
 
+        class _Client:
+            async def get(self, url: str, params: dict | None = None, **_: object):
+                asked.append(params or {})
+                body = (
+                    msgspec.json.encode({"Rows": [{"Id": "buy-now"}, {"Id": "auction"}]})
+                    if url == platform._SEARCH_URL
+                    else msgspec.json.encode({"data": [msgspec.to_builtins(i) for i in listings]})
+                )
+                return _Response(body)
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *_: object) -> bool:
+                return False
+
+        with mock.patch.object(primp, "AsyncClient", return_value=_Client()):
+            buy_now = await platform._fetch("手錶", 100, include_auction=False)
+            asked.clear()
+            everything = await platform._fetch("手錶", 100, include_auction=True)
+
+        assert [i.id for i in buy_now] == ["buy-now"], "auction listings must be filtered out"
+        assert [i.id for i in everything] == ["buy-now", "auction"], "the flag must let auctions through"
+        assert "type" not in asked[0], "include_auction=True must not send type=direct"
+
+    @pytest.mark.asyncio
+    async def test_search_include_auction_true_against_the_live_site(self) -> None:
+        """Test the flag path still works end to end."""
+        platform = RutenPlatform()
         products = await platform.search("手錶", max_results=20, include_auction=True)
         assert len(products) > 0
         assert all(p.platform == "ruten" for p in products)
@@ -114,3 +148,10 @@ class TestRuten:
 
         cheapest = sorted(p.price for p in pool)[:5]
         assert sorted(p.price for p in await platform.search("咖啡", max_results=5)) == cheapest
+
+
+class _Response:
+    """Minimal stand-in for a primp response."""
+
+    def __init__(self, content: bytes) -> None:
+        self.content, self.status_code = content, 200

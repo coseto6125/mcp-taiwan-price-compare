@@ -85,3 +85,19 @@ def parse_price(value: object) -> int | None:
     except (TypeError, ValueError, OverflowError):
         return None
 
+
+
+def calc_search_multiplier(require_words: KeywordGroups) -> int:
+    """
+    Widen a candidate pool in proportion to how much a keyword filter will discard.
+
+    Each AND group roughly halves the pass rate, so ask for 2^n as many, capped at 4x
+    to stay clear of the rate limits a much larger request would attract.
+
+    Args:
+        require_words: Keyword groups the caller will filter on, or None.
+
+    Returns:
+        The multiplier to apply to the pool size.
+    """
+    return min(1 << len(require_words), 4) if require_words else 1
