@@ -19,6 +19,7 @@ mcp = FastMCP(name="price-compare")
 service = PriceCompareService()
 
 # Valid platform names
+SearchMode = Literal["full", "fast"]
 PlatformName = Literal[
     "pchome", "momo", "coupang", "etmall", "rakuten", "yahoo_shopping", "yahoo_auction", "costco", "pxbox", "uniprosperity", "books", "ruten", "buy123", "pcone"
 ]
@@ -33,6 +34,7 @@ async def compare_prices(
     require_words: list[list[str]] | None = None,
     include_auction: bool = False,
     platform: PlatformName | None = None,
+    mode: SearchMode = "full",
 ) -> str:
     """
     Search cheapest products across all platforms (or single platform if specified).
@@ -56,7 +58,12 @@ async def compare_prices(
         include_auction: Include Yahoo auction bids (default: False)
 
         platform: Search single platform only. Options: pchome, momo, coupang, etmall, rakuten, yahoo_shopping, yahoo_auction, costco, pxbox, uniprosperity, books, ruten, buy123, pcone
-            None = search ALL platforms (default)
+            None = search platforms per `mode` (default)
+
+        mode: Which platforms a multi-platform search covers (default: "full")
+            "full" = all 14 platforms, ~2s, best price coverage
+            "fast" = the 9 sub-second platforms, ~0.5s, skips pcone/coupang/momo/rakuten/ruten
+            Ignored when `platform` is set - a named platform is always queried.
 
     Returns:
         TOON format: name, price, url, platform
@@ -65,7 +72,13 @@ async def compare_prices(
         products = await service.platforms[platform].search(query, top_n, min_price, max_price, require_words, include_auction=include_auction)
     else:
         products = await service.get_cheapest(
-            query, top_n, min_price=min_price, max_price=max_price, require_words=require_words, include_auction=include_auction
+            query,
+            top_n,
+            min_price=min_price,
+            max_price=max_price,
+            require_words=require_words,
+            include_auction=include_auction,
+            mode=mode,
         )
     return _to_toon(products)
 

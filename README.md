@@ -23,6 +23,7 @@
 | `require_words` | list[list[str]] | None | 關鍵字分組過濾。組與組是 AND 關係，組內是 OR 關係。例：[["SONY", "索尼"], ["電視", "TV"]] = (SONY OR 索尼) AND (電視 OR TV) |
 | `include_auction` | bool | False | 是否包含 Yahoo 拍賣競標商品 (預設僅含立即購買) |
 | `platform` | str | None | 指定單一平台搜尋。None = 搜尋所有平台。可選：pchome, momo, coupang, etmall, rakuten, yahoo_shopping, yahoo_auction, costco, pxbox, uniprosperity, books, ruten, buy123, pcone |
+| `mode` | str | "full" | 多平台搜尋的覆蓋範圍。`full` = 全部 14 個平台，約 2 秒；`fast` = 9 個次秒級平台，約 0.5 秒，略過 pcone、coupang、momo、rakuten、ruten。指定 `platform` 時此參數無效，具名平台一律查詢 |
 
 **回傳值**：`str` (TOON 格式) - 壓縮序列化的產品列表，以降低 LLM token 消耗
 
@@ -57,6 +58,8 @@ compare_prices(query="iPhone 15", include_auction=True)
 ```
 
 > **提示**：Coupang 等平台的搜尋結果有時會包含不相關的低價商品，使用 `require_words` 可有效過濾。
+
+> **延遲**：全平台併發的總時間等於最慢的平台。pcone 約 1.9 秒、coupang 與 momo 約 0.9 秒都是站方伺服器 render 時間，經三方獨立量測確認無法從 client 端改善（HTTP 版本、TLS 指紋、連線池、壓縮、較輕端點皆無效）。需要次秒回應時用 `mode="fast"`。
 
 ## 安裝
 

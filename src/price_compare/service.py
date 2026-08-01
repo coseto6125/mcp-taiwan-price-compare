@@ -38,6 +38,16 @@ class PriceCompareService:
     # them. Healthy platforms answer well inside this; a stalled one is simply dropped.
     PLATFORM_TIMEOUT = 3.0
 
+    # Platforms that answer a 100-result query inside 0.5s reliably, measured over
+    # randomised interleaved runs across 10 queries: median <= 0.5s and worst case
+    # <= 1.2s. The rest are excluded by their own server render time, not by anything
+    # client-side (pcone ~1.9s, coupang ~0.9s, momo ~0.9s, rakuten median 0.59s,
+    # ruten median 0.57s with an 8s tail). Every platform stays reachable through the
+    # single-platform path regardless of which set a fan-out uses.
+    FAST_PLATFORMS = frozenset(
+        {"etmall", "pchome", "buy123", "yahoo_auction", "yahoo_shopping", "uniprosperity", "pxbox", "books", "costco"}
+    )
+
     def __init__(self) -> None:
         self.platforms: dict[str, BasePlatform] = {
             "books": BooksPlatform(),
@@ -64,18 +74,29 @@ class PriceCompareService:
         max_price: int = 0,
         require_words: KeywordGroups = None,
         include_auction: bool = False,
+        mode: str = "full",
     ) -> SearchResult:
-        """Search across all platforms concurrently."""
+        """
+        Search across platforms concurrently.
+
+        Args:
+            mode: "full" queries every platform; "fast" queries only FAST_PLATFORMS,
+                trading the slower sites' coverage for a sub-second answer.
+        """
         args = (query, max_per_platform, min_price, max_price, require_words)
+        platforms = self._select(mode)
         results = await asyncio.gather(
-            *(
-                asyncio.wait_for(p.search(*args, include_auction=include_auction), self.PLATFORM_TIMEOUT)
-                for p in self.platforms.values()
-            ),
+            *(asyncio.wait_for(p.search(*args, include_auction=include_auction), self.PLATFORM_TIMEOUT) for p in platforms),
             return_exceptions=True,
         )
         products = list(flatten(r for r in results if isinstance(r, list)))
         return SearchResult(query=query, products=products, total_count=len(products))
+
+    def _select(self, mode: str) -> list["BasePlatform"]:
+        """Return the platforms a fan-out in this mode should query."""
+        if mode == "fast":
+            return [p for name, p in self.platforms.items() if name in self.FAST_PLATFORMS]
+        return list(self.platforms.values())
 
     async def get_cheapest(
         self,
@@ -87,9 +108,12 @@ class PriceCompareService:
         descending: bool = False,
         require_words: KeywordGroups = None,
         include_auction: bool = False,
+        mode: str = "full",
     ) -> list[Product]:
         """Get top N products sorted by price. Uses heapq for O(n log k)."""
-        result = await self.search_all_platforms(query, max_per_platform, min_price, max_price, require_words, include_auction)
+        result = await self.search_all_platforms(
+            query, max_per_platform, min_price, max_price, require_words, include_auction, mode
+        )
         if descending:
             return heapq.nlargest(top_n, result.products, key=attrgetter("price"))
         return heapq.nsmallest(top_n, result.products, key=attrgetter("price"))

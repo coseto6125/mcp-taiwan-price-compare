@@ -54,3 +54,35 @@ class TestPriceCompareService:
         products = await service.platforms["yahoo_auction"].search(sample_query, max_results=10)
         if products:
             assert all(p.price > 0 for p in products)
+
+    @pytest.mark.asyncio
+    async def test_fast_mode_queries_only_fast_platforms(self, sample_query: str) -> None:
+        """Test mode='fast' restricts the fan-out to the sub-second platform set."""
+        service = PriceCompareService()
+        result = await service.search_all_platforms(sample_query, max_per_platform=20, mode="fast")
+        assert result.total_count > 0
+        assert {p.platform for p in result.products} <= service.FAST_PLATFORMS
+
+    @pytest.mark.asyncio
+    async def test_full_mode_is_the_default_and_covers_more(self, sample_query: str) -> None:
+        """Test the default fan-out reaches platforms that fast mode leaves out."""
+        service = PriceCompareService()
+        full = await service.search_all_platforms(sample_query, max_per_platform=20)
+        fast = await service.search_all_platforms(sample_query, max_per_platform=20, mode="fast")
+        assert not {p.platform for p in full.products} <= service.FAST_PLATFORMS
+        assert full.total_count > fast.total_count
+
+    @pytest.mark.asyncio
+    async def test_fast_platform_set_excludes_the_slow_sites(self) -> None:
+        """Test the fast set omits the platforms measured above the 0.5s budget."""
+        service = PriceCompareService()
+        assert set(service.platforms) >= service.FAST_PLATFORMS
+        assert service.FAST_PLATFORMS.isdisjoint({"pcone", "coupang", "momo", "rakuten", "ruten"})
+
+    @pytest.mark.asyncio
+    async def test_named_platform_reachable_regardless_of_mode(self) -> None:
+        """Test a slow platform stays reachable through the single-platform path."""
+        service = PriceCompareService()
+        products = await service.platforms["pcone"].search("咖啡", max_results=5)
+        assert len(products) > 0
+        assert all(p.platform == "pcone" for p in products)
