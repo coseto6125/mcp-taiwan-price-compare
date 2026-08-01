@@ -376,18 +376,18 @@ wheels = [
 
 [[package]]
 name = "etoon"
-version = "0.4.1"
+version = "0.7.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "orjson" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/ff/ce/fd5172ccc49dc9448d80da5b931d1a0dd8dd8393d7f09924df17fa2da7d3/etoon-0.4.1.tar.gz", hash = "sha256:e5d872c398e61cabf56139edfb46319dcde644138046b5d860d95bbbfb94b005", size = 39062, upload-time = "2026-05-13T23:24:56.66Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/00/7b/28c1dd0db9382205dd9383271d7506cdc2bdff567cb8220d32d1507cd7c9/etoon-0.7.0.tar.gz", hash = "sha256:5d2d83aa47e4a36a6f6177e0200af60a3902d4dab74992683523b05928d5f914", size = 57463, upload-time = "2026-08-01T00:39:30.94Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/20/e3/40ba4125786a0b23672c58cd03b02beca88921e2cb800581fcfb6013af54/etoon-0.4.1-cp313-cp313-macosx_10_12_x86_64.whl", hash = "sha256:77f6e4b8a766202aeeca82b32c3597596eb3ddf84649815ddd40df4a209842ca", size = 333728, upload-time = "2026-05-13T23:24:50.904Z" },
-    { url = "https://files.pythonhosted.org/packages/d5/cd/216c1be4c44dfdbdc52bf2a729542edabcd9968cbdaeee2c98b2abfbe818/etoon-0.4.1-cp313-cp313-macosx_11_0_arm64.whl", hash = "sha256:2e1b60d2129a24ea007161a81f28a2467dae092291fc9ff7aab6a70c7e512680", size = 309317, upload-time = "2026-05-13T23:24:52.002Z" },
-    { url = "https://files.pythonhosted.org/packages/ab/45/a774b79a79476dfb8387ea673b843d337a8ccdb3862d1b2947842854c04d/etoon-0.4.1-cp313-cp313-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:5422fce434ebef4db9b533f300dd61a8dac6592ba7e612ff6f6945b928a731a7", size = 320295, upload-time = "2026-05-13T23:24:53.046Z" },
-    { url = "https://files.pythonhosted.org/packages/b1/5f/ee72c2d140e4169f291e808c84be6dfbfa7b4d09928cc9b347c65a51a037/etoon-0.4.1-cp313-cp313-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:20aee2f201cdae92d19870ed61f9a5c6ddb880e1665bb05f7458eee050463e15", size = 342172, upload-time = "2026-05-13T23:24:54.374Z" },
-    { url = "https://files.pythonhosted.org/packages/4b/13/b9ed16aecbf39eebbe77e5036f98dd1ad9951d97e6323783e15f6d743ce5/etoon-0.4.1-cp313-cp313-win_amd64.whl", hash = "sha256:b93ccf72059fbad6c622489934aaff1103cfb2a97c7dbbad15fe9b99a50b491c", size = 250909, upload-time = "2026-05-13T23:24:55.778Z" },
+    { url = "https://files.pythonhosted.org/packages/1a/b3/0d561924c0bf02d8eb93f22a6c1bda63071dfdfebc86097f9e2ec55c8fda/etoon-0.7.0-cp313-cp313-macosx_10_12_x86_64.whl", hash = "sha256:f8f674b998ef0283911ae4adfbe9403e01170ece12ee2b7a29823d79dfdceb89", size = 343356, upload-time = "2026-08-01T00:39:25.543Z" },
+    { url = "https://files.pythonhosted.org/packages/c4/20/417b60810e4698f51d5b70a7c85a703ed1462b968a740de74db20bfc56e6/etoon-0.7.0-cp313-cp313-macosx_11_0_arm64.whl", hash = "sha256:e6de8768bd40c90e1fa44d8cafd3070bc6e426ee6696645c642f18e237c153e3", size = 318235, upload-time = "2026-08-01T00:39:26.831Z" },
+    { url = "https://files.pythonhosted.org/packages/be/63/fc617b46ef54219fc656f1b290c7a2c92086f45d20e39c6813b7aec919d1/etoon-0.7.0-cp313-cp313-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:f00da246525ab26c750973e768fa2b6d3a672200f218f5b85a97ec9dbf3cd2e4", size = 326186, upload-time = "2026-08-01T00:39:27.927Z" },
+    { url = "https://files.pythonhosted.org/packages/db/4c/a1be8ece6fdda724a2367484bb3d869105fc6cc48eefc675d1cdd0e1e6d8/etoon-0.7.0-cp313-cp313-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:7c00516a88dc69677c63d8ce4020ef130227436f2bf3bc37bc950024c3caa21f", size = 350856, upload-time = "2026-08-01T00:39:28.899Z" },
+    { url = "https://files.pythonhosted.org/packages/24/ef/4355352ac0d61232a3e84e5e4be41f8fc0e676144edcaf7bdf21abdaec47/etoon-0.7.0-cp313-cp313-win_amd64.whl", hash = "sha256:0d3c9ca1bbfa86c1ab9b6277d6b3952ccbb5643388fe4022408ab860e0184d49", size = 262709, upload-time = "2026-08-01T00:39:30.101Z" },
 ]
 
 [[package]]
