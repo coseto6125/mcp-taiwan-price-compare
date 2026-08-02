@@ -240,10 +240,7 @@ uv run python -m price_compare "機械鍵盤" --desc
 - 🐛 **Coupang 修復**：該站改版為 Next.js 後舊選擇器全數失效、靜默回傳 0 筆。改以 CSS Module 前綴比對，並將已失效的 `sorter=LOWEST_PRICE_ASC` 換成 `salePriceAsc` 恢復低價優先
 - ⚡ **`mode` 參數**：`full`（預設，14 平台，約 2.1 秒）／`fast`（9 個次秒級平台，約 0.5 秒）。指定 `platform` 時不受影響，慢平台一律可查
 - 🔬 **離線解析測試**：新增 `tests/fixtures/` 與 `tests/test_parsers.py`，解析回歸不再需要真實網路才驗得出來（70 個測試、約 1.2 秒）。另附 `tests/fixtures/regenerate.py` 一次重抓全部 17 個 fixture，寫入前先用測試同一套 parser 讀回來，解析結果比現有 fixture 差就拒寫
-- 🔧 **CI 修復**：移除無 cp313 wheel 的 `regex-rs`（改用 stdlib `re`，實測快 2.4 倍）、修正 mypy 錯誤、平台矩陣補齊至 14 個、GitHub Actions 全面升級
-- 🧪 **CI 測試分層**：連網測試改用 `live` marker 標記，確定性閘門只跑 86 筆離線測試，站台 smoke 留在 14 平台矩陣（78 筆）。單一站台掛掉只會紅該平台，不再擋掉整個 gate
-- 🔒 **發版路徑補上閘門**：tag 不會觸發測試 workflow，先前 `git push --tags` 到 PyPI 之間沒有任何檢查。發版 workflow 新增 gate job，先驗 tag 與 `pyproject` 版本一致、lint、format、mypy、離線測試，通過才 build 與上傳
-- 🧹 **修掉三處「回報成功但沒檢查」**：ruff 設定把整個 `tests/` 排除在檢查範圍外、CI 的 `ruff check` 少了 `--no-fix` 而設定裡 `fix = true` 會就地改好再回報綠燈、workflow 自身的改動不在 CI 觸發路徑內。三者都修正，測試目錄納入 lint 與格式檢查
+- 🔧 **CI**：移除無 cp313 wheel 的 `regex-rs`（改用 stdlib `re`，實測快 2.4 倍）、平台矩陣補齊至 14 個、連網測試以 `live` marker 與離線測試分層（單一站台掛掉只紅該平台），發版流程加上閘門，版本號與測試未過不會上傳
 - 🚀 **效能**：pcone 改用持久連線（2.42 → 2.00 秒）、rakuten 修正結果數上限（原本寫死只回 60 筆）、service 層加上單平台 3 秒上限
 
 ### v0.4.0 (2026-05-13)
