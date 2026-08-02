@@ -9,6 +9,8 @@ Each test case represents a user request and the expected tool call.
 
 import pytest
 
+from price_compare.service import PriceCompareService
+
 # Test cases: (user_request, expected_tool, expected_params)
 COMPREHENSION_TEST_CASES = [
     # Basic full search
@@ -107,8 +109,8 @@ COMPREHENSION_TEST_CASES = [
 class TestMCPComprehension:
     """Test that simplified docs are still comprehensible."""
 
-    @pytest.mark.parametrize(("user_request", "expected_tool", "expected_params"), COMPREHENSION_TEST_CASES)
-    def test_tool_selection(self, user_request: str, expected_tool: str, expected_params: dict) -> None:
+    @pytest.mark.parametrize(("_user_request", "expected_tool", "expected_params"), COMPREHENSION_TEST_CASES)
+    def test_tool_selection(self, _user_request: str, expected_tool: str, expected_params: dict) -> None:
         """
         Verify expected tool and params for each user scenario.
 
@@ -121,8 +123,9 @@ class TestMCPComprehension:
 
         # Validate platform names if present
         if "platform" in expected_params:
-            valid_platforms = {"pchome", "momo", "coupang", "etmall", "rakuten", "yahoo_shopping", "yahoo_auction"}
-            assert expected_params["platform"] in valid_platforms
+            # Taken from the service rather than restated: this set went stale at 7 while
+            # the service grew to 14, so a case naming a new platform would have failed.
+            assert expected_params["platform"] in PriceCompareService().platforms
 
         # Validate require_words format if present
         if "require_words" in expected_params:

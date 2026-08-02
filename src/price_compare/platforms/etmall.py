@@ -2,6 +2,7 @@
 
 from collections.abc import Iterator
 from contextlib import suppress
+from functools import partial
 from typing import TYPE_CHECKING
 from urllib.parse import quote
 
@@ -72,11 +73,11 @@ class ETMallPlatform(BasePlatform[list[bytes]]):
             timeout=self._timeout,
             headers={"accept": "application/json", "referer": "https://www.etmall.com.tw/"},
         ) as client:
-            urls = [
-                f"{self._SEARCH_URL}?Keyword={quote(query)}&SortType=4&PageSize={self._PAGE_SIZE}&PageIndex={i}"
+            requests = [
+                partial(client.get, f"{self._SEARCH_URL}?Keyword={quote(query)}&SortType=4&PageSize={self._PAGE_SIZE}&PageIndex={i}")
                 for i in range(pages)
             ]
-            return await self._fetch_pages(client, urls)
+            return await self._fetch_pages(requests)
 
     def _extract(self, payload: list[bytes]) -> Iterator[Candidate]:
         """Read products out of each page body."""
@@ -88,4 +89,3 @@ class ETMallPlatform(BasePlatform[list[bytes]]):
                 for item in data.search_product_result.products:
                     url = f"{self._SITE_URL}{item.page_link}" if item.page_link else self._PRODUCT_URL.format(item.id)
                     yield Candidate(id=str(item.id), name=item.title, price=item.final_price, url=url)
-

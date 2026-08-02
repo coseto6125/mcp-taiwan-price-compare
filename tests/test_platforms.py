@@ -17,6 +17,10 @@ from price_compare.platforms import (
     YahooShoppingPlatform,
 )
 
+# Every test in this module reaches its platform over the network, so a site outage
+# reds it for reasons unrelated to the code. Deselect with `pytest -m "not live"`.
+pytestmark = pytest.mark.live
+
 
 class TestPChome:
     """Test PChome platform."""
@@ -51,9 +55,7 @@ class TestPChome:
         """Test price range filter works."""
         platform = PChomePlatform()
         min_price, max_price = 15000, 30000
-        products = await platform.search(
-            sample_query, max_results=10, min_price=min_price, max_price=max_price
-        )
+        products = await platform.search(sample_query, max_results=10, min_price=min_price, max_price=max_price)
         assert all(min_price <= p.price <= max_price for p in products)
 
 
@@ -104,9 +106,7 @@ class TestCoupang:
         """Test require_words filter works with keyword groups."""
         platform = CoupangPlatform()
         # Test with very specific keyword
-        products = await platform.search(
-            "Nintendo Switch OLED", max_results=5, require_words=[["Nintendo"], ["Switch"]]
-        )
+        products = await platform.search("Nintendo Switch OLED", max_results=5, require_words=[["Nintendo"], ["Switch"]])
         for p in products:
             name_lower = p.name.lower()
             assert "nintendo" in name_lower or "任天堂" in name_lower
@@ -159,12 +159,10 @@ class TestRakuten:
         """Test require_words filter works with keyword groups."""
         platform = RakutenPlatform()
         # Test with keyword groups
-        products = await platform.search(
-            "Nintendo Switch 主機", max_results=5, require_words=[["Nintendo", "任天堂"], ["Switch"]]
-        )
+        products = await platform.search("Nintendo Switch 主機", max_results=5, require_words=[["Nintendo", "任天堂"], ["Switch"]])
         for p in products:
             name_lower = p.name.lower()
-            assert ("nintendo" in name_lower or "任天堂" in name_lower)
+            assert "nintendo" in name_lower or "任天堂" in name_lower
             assert "switch" in name_lower
 
     @pytest.mark.asyncio

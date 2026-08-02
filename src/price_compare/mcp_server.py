@@ -21,7 +21,20 @@ service = PriceCompareService()
 
 # Valid platform names
 PlatformName = Literal[
-    "pchome", "momo", "coupang", "etmall", "rakuten", "yahoo_shopping", "yahoo_auction", "costco", "pxbox", "uniprosperity", "books", "ruten", "buy123", "pcone"
+    "pchome",
+    "momo",
+    "coupang",
+    "etmall",
+    "rakuten",
+    "yahoo_shopping",
+    "yahoo_auction",
+    "costco",
+    "pxbox",
+    "uniprosperity",
+    "books",
+    "ruten",
+    "buy123",
+    "pcone",
 ]
 
 
@@ -55,7 +68,8 @@ async def compare_prices(
         require_words: Require results to contain specific words. AND between groups, OR within group.
             Example: [["SONY", "索尼"], ["50"]] → must have (SONY OR 索尼) AND 50
 
-        include_auction: Include Yahoo auction bids (default: False)
+        include_auction: Include bid listings on the marketplaces that carry them,
+            Yahoo Auction and Ruten (default: False, buy-now only)
 
         platform: Search single platform only. Options: pchome, momo, coupang, etmall, rakuten, yahoo_shopping, yahoo_auction, costco, pxbox, uniprosperity, books, ruten, buy123, pcone
             None = search platforms per `mode` (default)

@@ -4,6 +4,10 @@ import pytest
 
 from price_compare.service import PriceCompareService
 
+# Every test in this module reaches its platform over the network, so a site outage
+# reds it for reasons unrelated to the code. Deselect with `pytest -m "not live"`.
+pytestmark = pytest.mark.live
+
 
 class TestPriceCompareService:
     """Test the main service."""
@@ -23,9 +27,7 @@ class TestPriceCompareService:
         """Test price filters are applied correctly."""
         service = PriceCompareService()
         min_price, max_price = 10000, 50000
-        products = await service.get_cheapest(
-            sample_query, top_n=20, min_price=min_price, max_price=max_price
-        )
+        products = await service.get_cheapest(sample_query, top_n=20, min_price=min_price, max_price=max_price)
         assert all(min_price <= p.price <= max_price for p in products)
 
     @pytest.mark.asyncio

@@ -9,6 +9,10 @@ import pytest
 
 from price_compare.platforms.buy123 import Buy123Platform
 
+# Every test in this module reaches its platform over the network, so a site outage
+# reds it for reasons unrelated to the code. Deselect with `pytest -m "not live"`.
+pytestmark = pytest.mark.live
+
 
 class TestBuy123:
     """Test buy123 platform."""

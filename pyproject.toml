@@ -81,7 +81,6 @@ exclude = [
   "dist",
   "node_modules",
   "mypy.ini",
-  "tests/",
   "docs/",
   "examples/",
   "streamlit",
@@ -227,3 +226,7 @@ asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 testpaths = ["tests"]
 filterwarnings = ["ignore::DeprecationWarning"]
+addopts = "--strict-markers" # 打錯的 marker 直接報錯，而不是靜默不套用
+markers = [
+  "live: 需要真實網路，站台掛掉就會紅；離線跑用 -m \"not live\" 排除",
+]

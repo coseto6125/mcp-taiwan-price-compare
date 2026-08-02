@@ -9,6 +9,10 @@ import pytest
 
 from price_compare.platforms.books import BooksPlatform
 
+# Every test in this module reaches its platform over the network, so a site outage
+# reds it for reasons unrelated to the code. Deselect with `pytest -m "not live"`.
+pytestmark = pytest.mark.live
+
 
 class TestBooks:
     """Test 博客來 platform."""

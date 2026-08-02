@@ -21,7 +21,7 @@
 | `min_price` | int | 0 | 最低價格過濾 (0=不過濾) |
 | `max_price` | int | 0 | 最高價格過濾 (0=不過濾) |
 | `require_words` | list[list[str]] | None | 關鍵字分組過濾。組與組是 AND 關係，組內是 OR 關係。例：[["SONY", "索尼"], ["電視", "TV"]] = (SONY OR 索尼) AND (電視 OR TV) |
-| `include_auction` | bool | False | 是否包含 Yahoo 拍賣競標商品 (預設僅含立即購買) |
+| `include_auction` | bool | False | 是否包含競標商品，影響 Yahoo 拍賣與露天市集 (預設僅含立即購買) |
 | `platform` | str | None | 指定單一平台搜尋。None = 搜尋所有平台。可選：pchome, momo, coupang, etmall, rakuten, yahoo_shopping, yahoo_auction, costco, pxbox, uniprosperity, books, ruten, buy123, pcone |
 | `mode` | str | "full" | 多平台搜尋的覆蓋範圍。`full` = 全部 14 個平台，約 2 秒；`fast` = 9 個次秒級平台，約 0.5 秒，略過 pcone、coupang、momo、rakuten、ruten。指定 `platform` 時此參數無效，具名平台一律查詢 |
 
@@ -229,15 +229,15 @@ uv run python -m price_compare "機械鍵盤" --desc
 - 🐛 **ETMall 靜默失效**：`PageSize` 超過約 45 會回 400，而 service 固定傳 100，等於該平台在每次全平台搜尋都回 0 筆。改為分頁抓取後恢復
 - 🐛 **排序宣稱不可信**：Coupang 的 `salePriceAsc`（實測 16 處逆序）與 Rakuten 的 `LowestPrice`（前 5 筆為贊助排序 720/2160/740/1080/1160）都不是真正升冪。改為一律由管線排序，`ordered_by_price` 這個會出錯的宣告直接移除
 - 🧹 **依平台的基礎過濾**：各站以自身的資料特性排除「不是該商品售價」的刊登
-  - Rakuten／Yahoo購物／Yahoo拍賣：站方回報價格區間者為多規格賣場的地板價（Rakuten 咖啡查詢中 47/100 是多規格，一個 $1~$140 的咖啡紙杯賣場會以 $1 排在最前），一律排除
+  - Rakuten／Yahoo拍賣：站方回報價格區間者為多規格賣場的地板價（Rakuten 咖啡查詢中 47/100 是多規格，一個 $1~$140 的咖啡紙杯賣場會以 $1 排在最前）。實測 206 筆區間刊登的價差分佈在 6 倍與 10 倍之間有明顯谷底，超過 8 倍者排除。Yahoo購物中心沒有回報區間的欄位，不適用此規則
   - PChome：`【加價購】` 無法單獨購買
-  - Yahoo拍賣：徵求／收購（買方刊登）、維修與客製化服務、一元起標、滿額贈
+  - Yahoo拍賣：【徵】／求購／收購中（買方刊登）、請勿下標等佔位刊登、訂金專區、一元起標、滿額贈。比對的是交易意圖用語而非主題字，因此「維修工具」「訂製印章」這類以用途命名的正常商品會保留（早期版本比對裸的維修／訂製／客製化，60 筆結果丟掉 49 筆）
   - 仍會保留的是關鍵字灌水造成的偶然命中（例如 $1 髮圈因有「咖啡色」選項而命中「咖啡」），那屬相關性問題，請用 `require_words` 過濾
 - 🐛 **ETMall 與 PChome 缺少去重**：其餘 12 個平台都有，這兩個沒有，共用管線一併補上
 - 🛒 **平台擴充**：7 → 14 個平台，新增 Costco、全聯全電商、萬家福、博客來、露天市集、生活市集、松果購物，各附完整整合測試
 - 🐛 **Coupang 修復**：該站改版為 Next.js 後舊選擇器全數失效、靜默回傳 0 筆。改以 CSS Module 前綴比對，並將已失效的 `sorter=LOWEST_PRICE_ASC` 換成 `salePriceAsc` 恢復低價優先
 - ⚡ **`mode` 參數**：`full`（預設，14 平台，約 2.1 秒）／`fast`（9 個次秒級平台，約 0.5 秒）。指定 `platform` 時不受影響，慢平台一律可查
-- 🔬 **離線解析測試**：新增 `tests/fixtures/` 與 `tests/test_parsers.py`，解析回歸不再需要真實網路才驗得出來（21 個測試、0.02 秒）
+- 🔬 **離線解析測試**：新增 `tests/fixtures/` 與 `tests/test_parsers.py`，解析回歸不再需要真實網路才驗得出來（70 個測試、約 1.2 秒）。另附 `tests/fixtures/regenerate.py` 一次重抓全部 17 個 fixture，寫入前先用測試同一套 parser 讀回來，解析結果比現有 fixture 差就拒寫
 - 🔧 **CI 修復**：移除無 cp313 wheel 的 `regex-rs`（改用 stdlib `re`，實測快 2.4 倍）、修正 mypy 錯誤、平台矩陣補齊至 14 個
 - 🚀 **效能**：pcone 改用持久連線（2.42 → 2.00 秒）、rakuten 修正結果數上限（原本寫死只回 60 筆）、service 層加上單平台 3 秒上限
 

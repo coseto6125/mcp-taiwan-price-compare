@@ -13,6 +13,10 @@
 | `books_search.html` | books | 6 |
 | `uniprosperity_search.html` | uniprosperity | 8 |
 
+另有三個 `*_escaped_quote.html`，內容是同一份頁面把第一個商品的名稱改成
+`SONY 27&quot;顯示器 特仕版`，用來驗證解析器不會在那個跳脫引號處把名稱截斷。它們由重抓
+腳本從當次抓到的頁面直接推導，不是另外抓的，所以和 `*_search.html` 永遠同一份標記。
+
 ## `*_payload.json` — 其餘 11 個平台
 
 HTML 以外的平台，`_fetch` 回傳的是解碼後的結構而非原始位元組，形狀各站不同
@@ -29,11 +33,16 @@ Costco 的 fixture 刻意混入 2 筆無標價的賣場現場品項，用來驗�
 重抓執行 `tests/fixtures/regenerate.py`：
 
 ```bash
-.venv/bin/python tests/fixtures/regenerate.py
+.venv/bin/python -m tests.fixtures.regenerate
 ```
 
-該腳本會重抓全部 14 個 fixture（3 個 HTML 加 11 個 JSON payload）並印出各自的解析筆數，
-把印出的數字對回 `EXPECTED`。
+該腳本會重抓全部 17 個 fixture（3 個 HTML 搜尋頁、由它們推導的 3 個跳脫引號版、11 個 JSON
+payload），每個檔案都用測試同一套 loader 與 parser 讀回來，印出「幾筆 candidate、幾筆
+product」。HTML 那三個要填的是 **product** 數（`PARSERS` 第三欄釘的是 `build()` 之後的結果），
+payload 則是 **兩個數字整組**填進 `EXPECTED`。
+
+站台改版導致抓回來的東西解析不出商品時，腳本印一行 `left as-is` 就跳過，不會用壞掉的內容
+覆蓋既有 fixture — 重抓的時機通常正是站台剛改版的時候。
 
 ## 什麼時候該重抓
 

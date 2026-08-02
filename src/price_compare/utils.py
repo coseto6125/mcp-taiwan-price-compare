@@ -86,7 +86,6 @@ def parse_price(value: object) -> int | None:
         return None
 
 
-
 def calc_search_multiplier(require_words: KeywordGroups) -> int:
     """
     Widen a candidate pool in proportion to how much a keyword filter will discard.

@@ -11,6 +11,7 @@ site's markup changes on purpose - a diff there is the record of what changed.
 """
 
 import pathlib
+from functools import partial
 
 import msgspec
 import pytest
@@ -20,6 +21,7 @@ from price_compare.platforms.base import Candidate
 from price_compare.platforms.books import BooksPlatform
 from price_compare.platforms.coupang import CoupangPlatform
 from price_compare.platforms.etmall import ETMallPlatform
+from price_compare.platforms.momo import MomoPlatform, _read_page
 from price_compare.platforms.pchome import PChomePlatform
 from price_compare.platforms.pxbox import _PxboxProduct
 from price_compare.platforms.rakuten import RakutenPlatform
@@ -43,7 +45,11 @@ PARSER_IDS = [cls.name for cls, _, _ in PARSERS]
 FIXTURES_ONLY = [(cls, fixture) for cls, fixture, _ in PARSERS]
 CLASSES_ONLY = [cls for cls, _, _ in PARSERS]
 # Same pages with one product's name rewritten to hold an escaped quote.
-ESCAPED_QUOTE_FIXTURES = {"uniprosperity": "uniprosperity_escaped_quote.html", "books": "books_escaped_quote.html", "coupang": "coupang_escaped_quote.html"}
+ESCAPED_QUOTE_FIXTURES = {
+    "uniprosperity": "uniprosperity_escaped_quote.html",
+    "books": "books_escaped_quote.html",
+    "coupang": "coupang_escaped_quote.html",
+}
 
 
 def parse(platform_cls, fixture: str, **kwargs) -> list[Product]:
@@ -216,7 +222,7 @@ def test_pchome_drops_add_on_only_items() -> None:
 
 @pytest.mark.parametrize(
     "title",
-        [
+    [
         "【徵】 Fiio RC-BT 藍牙耳機線",
         "求購75年76年蔣公拾元硬幣，一枚100元收",
         "已賣出請勿下標 牛仔褲短褲",
@@ -261,9 +267,7 @@ def test_yahoo_auction_keeps_ordinary_listings(title: str) -> None:
     merely name what they are for.
     """
     platform = YahooAuctionPlatform()
-    hit = _YahooAuctionProduct(
-        ec_title=title, ec_buyprice=6990.0, ec_item_url="https://tw.bid.yahoo.com/item/2", ec_productid="2"
-    )
+    hit = _YahooAuctionProduct(ec_title=title, ec_buyprice=6990.0, ec_item_url="https://tw.bid.yahoo.com/item/2", ec_productid="2")
     assert [c.name for c in platform._extract(([hit], True))] == [title]
 
 
@@ -366,6 +370,11 @@ class _Response:
         self.content, self.status_code = content, 200
 
 
+def _page_requests(client: _FlakyClient, count: int) -> list:
+    """Build the per-page thunks `_fetch_pages` sends, one per page index."""
+    return [partial(client.get, f"https://example.test/?p={i}") for i in range(count)]
+
+
 @pytest.mark.asyncio
 async def test_paged_fetch_retries_only_the_pages_that_failed() -> None:
     """
@@ -376,7 +385,7 @@ async def test_paged_fetch_retries_only_the_pages_that_failed() -> None:
     """
     platform = ETMallPlatform()
     client = _FlakyClient(fail_first={1})
-    bodies = await platform._fetch_pages(client, [f"https://example.test/?p={i}" for i in range(3)])
+    bodies = await platform._fetch_pages(_page_requests(client, 3))
 
     assert bodies is not None
     assert [msgspec.json.decode(b)["page"] for b in bodies] == [0, 1, 2], "pages must stay in order"
@@ -394,7 +403,49 @@ async def test_paged_fetch_gives_up_rather_than_returning_a_hole() -> None:
     platform = ETMallPlatform()
     client = _FlakyClient(fail_first=set(), fail_always={0})
 
-    assert await platform._fetch_pages(client, [f"https://example.test/?p={i}" for i in range(3)]) is None
+    assert await platform._fetch_pages(_page_requests(client, 3)) is None
+
+
+class _JsonResponse:
+    """A 200 response carrying a decoded body, as momo's API answers."""
+
+    def __init__(self, payload: dict) -> None:
+        self.payload, self.status_code = payload, 200
+
+    def json(self) -> dict:
+        return self.payload
+
+
+class _SuccessFlagClient:
+    """Answers 200 for every page, reporting failure in the body on the first try."""
+
+    def __init__(self, fail_first: set[int]) -> None:
+        self.fail_first, self.seen = fail_first, []
+
+    async def post(self, _url: str, **kwargs: object):
+        page = kwargs["json"]["data"]["curPage"]
+        self.seen.append(page)
+        succeeded = page not in self.fail_first or self.seen.count(page) > 1
+        return _JsonResponse({"success": succeeded, "rtnSearchData": {"goodsInfoList": []}})
+
+
+@pytest.mark.asyncio
+async def test_paged_fetch_retries_a_page_the_body_reports_as_failed() -> None:
+    """
+    Test a 200 carrying success=false is retried like a transport failure.
+
+    momo reports a refused search in the body rather than the status, so a status-only
+    check would take an empty page for a real one and return a hole.
+    """
+    platform = MomoPlatform()
+    client = _SuccessFlagClient(fail_first={2})
+    requests = [partial(client.post, "https://example.test", json=platform._build_payload("咖啡", page)) for page in (1, 2, 3)]
+
+    bodies = await platform._fetch_pages(requests, _read_page)
+
+    assert bodies is not None
+    assert len(bodies) == 3
+    assert client.seen == [1, 2, 3, 2], "only the page the body rejected is retried"
 
 
 def test_variant_spread_cut_sits_where_the_measured_distribution_splits() -> None:

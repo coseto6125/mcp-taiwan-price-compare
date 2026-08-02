@@ -17,7 +17,8 @@ from price_compare.platforms.base import BasePlatform, Candidate
 # Salesforce Commerce Cloud tiles: every field is an attribute on the anchor that
 # opens the tile, so matching the opening tag alone is enough. The same product also
 # appears in a sibling favourite widget carrying data-likepid, which this pattern skips.
-_TILE_PATTERN = re.compile(r'<a class="gtm-product-alink"([^>]*)>')
+_TILE_DELIMITER = '<a class="gtm-product-alink"'
+_TILE_PATTERN = re.compile(rf"{re.escape(_TILE_DELIMITER)}([^>]*)>")
 _PID_PATTERN = re.compile(r'data-pid="([^"]+)"')
 _PRICE_PATTERN = re.compile(r'data-price="([\d.]+)"')
 _NAME_PATTERN = re.compile(r'data-name="([^"]*)"')
@@ -35,10 +36,7 @@ class UniProsperityPlatform(BasePlatform[str]):
     # The storefront's own grid endpoint returns the full result set as a bare product
     # list, roughly 15x smaller than the rendered search page it backs. It offers no
     # price ordering, so the pipeline sorts what comes back.
-    _SEARCH_URL = (
-        "https://online.uni-prosperity.com.tw"
-        "/on/demandware.store/Sites-Uniprosperity-Site/default/Search-UpdateGrid?q=q%3D{}"
-    )
+    _SEARCH_URL = "https://online.uni-prosperity.com.tw/on/demandware.store/Sites-Uniprosperity-Site/default/Search-UpdateGrid?q=q%3D{}"
 
     def __init__(self, impersonate: "IMPERSONATE | None" = "chrome_142", timeout: float = 30.0) -> None:
         self._impersonate = impersonate

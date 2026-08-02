@@ -36,14 +36,21 @@ jobs:
       - name: Install dependencies
         run: uv sync --extra dev
 
+      # --no-fix is required: pyproject sets fix = true, so a bare `ruff check` repairs
+      # the checkout and reports green on code that never passed.
       - name: Run linter
-        run: uv run ruff check src/
+        run: uv run ruff check --no-fix src tests
+
+      - name: Check formatting
+        run: uv run ruff format --check src tests
 
       - name: Run type checker
         run: uv run mypy src/price_compare/ --ignore-missing-imports
 
-      - name: Run tests
-        run: uv run pytest tests/ -v --tb=short
+      # Deterministic tests only. The live-network ones run in the matrix below, where a
+      # site outage reds one platform instead of the whole gate.
+      - name: Run offline tests
+        run: uv run pytest tests/ -v --tb=short -m "not live"
         env:
           PYTHONUNBUFFERED: "1"
 
@@ -116,6 +123,6 @@ jobs:
         run: uv sync --extra dev
 
       - name: Test ${{ matrix.platform }}
-        run: uv run pytest ${{ matrix.file }} -v -k ${{ matrix.klass }} --tb=short
+        run: uv run pytest ${{ matrix.file }} -v -k ${{ matrix.klass }} -m live --tb=short
         env:
           PYTHONUNBUFFERED: "1"

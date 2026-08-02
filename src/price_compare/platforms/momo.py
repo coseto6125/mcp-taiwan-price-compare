@@ -1,8 +1,8 @@
 """momo platform implementation."""
 
-import asyncio
 from collections.abc import Iterator
 from contextlib import suppress
+from functools import partial
 from typing import TYPE_CHECKING
 
 import never_primp as primp
@@ -10,7 +10,21 @@ import never_primp as primp
 if TYPE_CHECKING:
     from never_primp import IMPERSONATE
 
-from price_compare.platforms.base import BasePlatform, Candidate
+from price_compare.platforms.base import BasePlatform, Candidate, PageResponse
+
+
+def _read_page(resp: PageResponse) -> dict | None:
+    """
+    Read a momo page body, or None when the site answered 200 with a failure.
+
+    momo reports a refused search in the body rather than in the status, so a page
+    carrying success=false has to count as a failure the retry loop can act on.
+    """
+    with suppress(Exception):
+        data = resp.json()
+        return data if isinstance(data, dict) and data.get("success") else None
+    return None
+
 
 # Static payload template (filters that never change)
 _PAYLOAD_TEMPLATE: dict = {
@@ -78,36 +92,8 @@ class MomoPlatform(BasePlatform[list[dict]]):
             http2_only=True,
             headers={"content-type": "application/json", "origin": "https://m.momoshop.com.tw", "referer": "https://m.momoshop.com.tw/"},
         ) as client:
-            bodies: list[dict | None] = [None] * pages
-            pending = list(range(pages))
-
-            # Retry individual pages rather than discarding the set: a hole is not a
-            # partial success, but refusing partials without retries leaves the whole
-            # platform silent on a transient failure.
-            for attempt in range(self.PAGE_ATTEMPTS):
-                responses = await asyncio.gather(
-                    *(client.post(self._API_URL, json=self._build_payload(query, i + 1)) for i in pending),
-                    return_exceptions=True,
-                )
-                failed = []
-                for index, resp in zip(pending, responses):
-                    data = None
-                    if not isinstance(resp, BaseException) and resp.status_code == 200:
-                        with suppress(Exception):
-                            data = resp.json()
-                    if data and data.get("success"):
-                        bodies[index] = data
-                    else:
-                        failed.append(index)
-
-                if not failed:
-                    break
-                pending = failed
-                if attempt + 1 == self.PAGE_ATTEMPTS:
-                    return None
-                await asyncio.sleep(self.PAGE_RETRY_DELAY)
-
-        return [body for body in bodies if body is not None] or None
+            requests = [partial(client.post, self._API_URL, json=self._build_payload(query, page)) for page in range(1, pages + 1)]
+            return await self._fetch_pages(requests, _read_page)
 
     def _extract(self, payload: list[dict]) -> Iterator[Candidate]:
         """Read goods out of each page body."""

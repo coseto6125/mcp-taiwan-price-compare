@@ -48,9 +48,7 @@ class PriceCompareService:
     # client-side (pcone ~1.9s, coupang ~0.9s, momo ~0.9s, rakuten median 0.59s,
     # ruten median 0.57s with an 8s tail). Every platform stays reachable through the
     # single-platform path regardless of which set a fan-out uses.
-    FAST_PLATFORMS = frozenset(
-        {"etmall", "pchome", "buy123", "yahoo_auction", "yahoo_shopping", "uniprosperity", "pxbox", "books", "costco"}
-    )
+    FAST_PLATFORMS = frozenset({"etmall", "pchome", "buy123", "yahoo_auction", "yahoo_shopping", "uniprosperity", "pxbox", "books", "costco"})
 
     def __init__(self) -> None:
         self.platforms: dict[str, BasePlatform] = {
@@ -131,9 +129,7 @@ class PriceCompareService:
         mode: SearchMode = "full",
     ) -> list[Product]:
         """Get top N products sorted by price. Uses heapq for O(n log k)."""
-        result = await self.search_all_platforms(
-            query, max_per_platform, min_price, max_price, require_words, include_auction, mode
-        )
+        result = await self.search_all_platforms(query, max_per_platform, min_price, max_price, require_words, include_auction, mode)
         if descending:
             return heapq.nlargest(top_n, result.products, key=attrgetter("price"))
         return heapq.nsmallest(top_n, result.products, key=attrgetter("price"))

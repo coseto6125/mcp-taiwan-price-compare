@@ -9,6 +9,10 @@ import pytest
 
 from price_compare.platforms.pcone import PconePlatform
 
+# Every test in this module reaches its platform over the network, so a site outage
+# reds it for reasons unrelated to the code. Deselect with `pytest -m "not live"`.
+pytestmark = pytest.mark.live
+
 
 class TestPcone:
     """Test pcone platform."""
@@ -45,9 +49,7 @@ class TestPcone:
     async def test_search_with_keywords(self, sample_query_cheap: str) -> None:
         """Test require_words filter works with keyword groups."""
         platform = PconePlatform()
-        products = await platform.search(
-            sample_query_cheap, max_results=20, require_words=[["iphone"]]
-        )
+        products = await platform.search(sample_query_cheap, max_results=20, require_words=[["iphone"]])
         assert len(products) > 0
         assert all("iphone" in p.name.lower() for p in products)
 

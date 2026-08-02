@@ -2,6 +2,7 @@
 
 from collections.abc import Iterator
 from contextlib import suppress
+from functools import partial
 from typing import TYPE_CHECKING
 from urllib.parse import quote
 
@@ -56,8 +57,8 @@ class PChomePlatform(BasePlatform[list[bytes]]):
         pages = min(-(-max_results // self._PAGE_SIZE), self._MAX_PAGES)  # ceiling division
 
         async with primp.AsyncClient(impersonate=self._impersonate, timeout=self._timeout, http2_only=True) as client:
-            urls = [f"{self._BASE_URL}?q={quote(query)}&page={p}&sort=prc/ac" for p in range(1, pages + 1)]
-            return await self._fetch_pages(client, urls)
+            requests = [partial(client.get, f"{self._BASE_URL}?q={quote(query)}&page={p}&sort=prc/ac") for p in range(1, pages + 1)]
+            return await self._fetch_pages(requests)
 
     def _extract(self, payload: list[bytes]) -> Iterator[Candidate]:
         """Read products out of each page body."""

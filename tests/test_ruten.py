@@ -13,6 +13,10 @@ import pytest
 
 from price_compare.platforms.ruten import RutenPlatform, _Item
 
+# Every test in this module reaches its platform over the network, so a site outage
+# reds it for reasons unrelated to the code. Deselect with `pytest -m "not live"`.
+pytestmark = pytest.mark.live
+
 
 class TestRuten:
     """Test Ruten platform."""
