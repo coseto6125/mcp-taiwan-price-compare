@@ -3,11 +3,15 @@ name: Test
 on:
   push:
     branches: [master, main]
+    # `.github/workflows/**` is watched too: without it a change to the workflows
+    # themselves runs nothing, so a broken gate is only found by the next commit that
+    # happens to touch src or tests.
     paths:
       - 'src/**'
       - 'tests/**'
       - 'pyproject.toml'
       - 'uv.lock'
+      - '.github/workflows/**'
   pull_request:
     branches: [master, main]
     paths:
@@ -15,7 +19,14 @@ on:
       - 'tests/**'
       - 'pyproject.toml'
       - 'uv.lock'
+      - '.github/workflows/**'
   workflow_dispatch:
+
+# A new push supersedes the previous run on the same ref; the old one is only burning
+# minutes on code nobody will merge.
+concurrency:
+  group: test-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   test:
@@ -123,6 +134,6 @@ jobs:
         run: uv sync --extra dev
 
       - name: Test ${{ matrix.platform }}
-        run: uv run pytest ${{ matrix.file }} -v -k ${{ matrix.klass }} -m live --tb=short
+        run: uv run pytest "${{ matrix.file }}" -v -k "${{ matrix.klass }}" -m live --tb=short
         env:
           PYTHONUNBUFFERED: "1"

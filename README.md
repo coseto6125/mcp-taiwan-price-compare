@@ -224,7 +224,7 @@ uv run python -m price_compare "機械鍵盤" --desc
 
 ## 版本歷史
 
-### v0.5.0 (2026-08-01)
+### v0.5.0 (2026-08-03)
 - 🏗️ **架構深化**：`BasePlatform` 由純介面宣告改為承載共用管線（去重、價格轉型、價格上下界、關鍵字分組、排序、截斷）。各平台只需實作 `_fetch`（連網）與 `_extract`（純函式），規則無法在平台間漂移
 - 🐛 **ETMall 靜默失效**：`PageSize` 超過約 45 會回 400，而 service 固定傳 100，等於該平台在每次全平台搜尋都回 0 筆。改為分頁抓取後恢復
 - 🐛 **排序宣稱不可信**：Coupang 的 `salePriceAsc`（實測 16 處逆序）與 Rakuten 的 `LowestPrice`（前 5 筆為贊助排序 720/2160/740/1080/1160）都不是真正升冪。改為一律由管線排序，`ordered_by_price` 這個會出錯的宣告直接移除
@@ -234,11 +234,16 @@ uv run python -m price_compare "機械鍵盤" --desc
   - Yahoo拍賣：【徵】／求購／收購中（買方刊登）、請勿下標等佔位刊登、訂金專區、一元起標、滿額贈。比對的是交易意圖用語而非主題字，因此「維修工具」「訂製印章」這類以用途命名的正常商品會保留（早期版本比對裸的維修／訂製／客製化，60 筆結果丟掉 49 筆）
   - 仍會保留的是關鍵字灌水造成的偶然命中（例如 $1 髮圈因有「咖啡色」選項而命中「咖啡」），那屬相關性問題，請用 `require_words` 過濾
 - 🐛 **ETMall 與 PChome 缺少去重**：其餘 12 個平台都有，這兩個沒有，共用管線一併補上
+- 🐛 **分頁的 all-or-nothing 讓 ETMall 常態消音**：任一頁失敗就丟棄整組結果，實測 8 次搜尋有 3 次因此完全無結果，而每一次重試都會成功。改為逐頁重試，但仍拒絕有破洞的結果集（缺的若是第一頁，回的甚至不是站方最便宜的那批）
+- 🐛 **商品名含跳脫引號被截斷**：先對整頁 unescape 再比對，`&quot;` 會變成裸引號提前關掉屬性比對，`SONY 27&quot;LCD` 只解析出 `SONY 27`。改為只對捕獲值做 unescape，並加上三個平台的跳脫引號 fixture 釘住
 - 🛒 **平台擴充**：7 → 14 個平台，新增 Costco、全聯全電商、萬家福、博客來、露天市集、生活市集、松果購物，各附完整整合測試
 - 🐛 **Coupang 修復**：該站改版為 Next.js 後舊選擇器全數失效、靜默回傳 0 筆。改以 CSS Module 前綴比對，並將已失效的 `sorter=LOWEST_PRICE_ASC` 換成 `salePriceAsc` 恢復低價優先
 - ⚡ **`mode` 參數**：`full`（預設，14 平台，約 2.1 秒）／`fast`（9 個次秒級平台，約 0.5 秒）。指定 `platform` 時不受影響，慢平台一律可查
 - 🔬 **離線解析測試**：新增 `tests/fixtures/` 與 `tests/test_parsers.py`，解析回歸不再需要真實網路才驗得出來（70 個測試、約 1.2 秒）。另附 `tests/fixtures/regenerate.py` 一次重抓全部 17 個 fixture，寫入前先用測試同一套 parser 讀回來，解析結果比現有 fixture 差就拒寫
-- 🔧 **CI 修復**：移除無 cp313 wheel 的 `regex-rs`（改用 stdlib `re`，實測快 2.4 倍）、修正 mypy 錯誤、平台矩陣補齊至 14 個
+- 🔧 **CI 修復**：移除無 cp313 wheel 的 `regex-rs`（改用 stdlib `re`，實測快 2.4 倍）、修正 mypy 錯誤、平台矩陣補齊至 14 個、GitHub Actions 全面升級
+- 🧪 **CI 測試分層**：連網測試改用 `live` marker 標記，確定性閘門只跑 86 筆離線測試，站台 smoke 留在 14 平台矩陣（78 筆）。單一站台掛掉只會紅該平台，不再擋掉整個 gate
+- 🔒 **發版路徑補上閘門**：tag 不會觸發測試 workflow，先前 `git push --tags` 到 PyPI 之間沒有任何檢查。發版 workflow 新增 gate job，先驗 tag 與 `pyproject` 版本一致、lint、format、mypy、離線測試，通過才 build 與上傳
+- 🧹 **修掉三處「回報成功但沒檢查」**：ruff 設定把整個 `tests/` 排除在檢查範圍外、CI 的 `ruff check` 少了 `--no-fix` 而設定裡 `fix = true` 會就地改好再回報綠燈、workflow 自身的改動不在 CI 觸發路徑內。三者都修正，測試目錄納入 lint 與格式檢查
 - 🚀 **效能**：pcone 改用持久連線（2.42 → 2.00 秒）、rakuten 修正結果數上限（原本寫死只回 60 筆）、service 層加上單平台 3 秒上限
 
 ### v0.4.0 (2026-05-13)
