@@ -216,6 +216,12 @@ uv run python -m price_compare "藍牙耳機" -n 20 --min 500 --max 3000
 uv run python -m price_compare "機械鍵盤" --desc
 ```
 
+## ☕ 贊助
+
+這個專案維護靠愛發電。覺得好用的話，歡迎請作者喝杯咖啡；贊助時在「留言」寫下你想要的平台或功能，有機會優先做：
+
+[![贊助](https://img.shields.io/badge/%E8%B4%8A%E5%8A%A9-%E7%B6%A0%E7%95%8C%20ECPay-1aa260?style=for-the-badge)](https://p.ecpay.com.tw/AA249AA)
+
 ## 參考資料
 
 - [Model Context Protocol 官方文件](https://modelcontextprotocol.io/docs/develop/connect-local-servers)

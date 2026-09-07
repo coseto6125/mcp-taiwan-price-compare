@@ -229,4 +229,5 @@ filterwarnings = ["ignore::DeprecationWarning"]
 addopts = "--strict-markers" # 打錯的 marker 直接報錯，而不是靜默不套用
 markers = [
   "live: 需要真實網路，站台掛掉就會紅；離線跑用 -m \"not live\" 排除",
+  "smoke: 每日排程的存活檢查，只確認 API 還查得到商品；由 .github/workflows/smoke.yml 執行",
 ]

@@ -1,0 +1,37 @@
+name: Smoke
+
+# GitHub runs cron in UTC unless the entry names an IANA zone; Taiwan has no DST, so
+# the local time never drifts. Schedules are best-effort and only fire on the default
+# branch; an hour-mark slot can run late or be dropped under load.
+on:
+  schedule:
+    - cron: '0 23 * * *'
+      timezone: "Asia/Taipei"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          version: "latest"
+
+      - name: Set up Python
+        run: uv python install 3.13
+
+      - name: Install dependencies
+        run: uv sync --extra dev
+
+      - name: Search for a staple keyword
+        run: uv run pytest tests/test_smoke.py -v -m smoke --tb=short
+        env:
+          PYTHONUNBUFFERED: "1"
