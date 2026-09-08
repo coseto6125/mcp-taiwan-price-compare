@@ -106,9 +106,10 @@ jobs:
           - platform: uniprosperity
             file: tests/test_uniprosperity.py
             klass: TestUniProsperity
-          - platform: books
-            file: tests/test_books.py
-            klass: TestBooks
+          # books is deliberately absent: books.com.tw sits behind Cloudflare and answers
+          # 403 to GitHub-hosted runners (probed 2026-09-08 with the project's own client,
+          # cf-ray in SEA), while the same request from Taiwan returns 200. The tests still
+          # run locally: `uv run pytest tests/test_books.py -m live`.
           - platform: ruten
             file: tests/test_ruten.py
             klass: TestRuten
