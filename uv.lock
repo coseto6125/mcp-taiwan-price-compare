@@ -1,5 +1,5 @@
 version = 1
-revision = 3
+revision = 5
 requires-python = ">=3.13"
 resolution-markers = [
     "python_full_version >= '3.15'",
@@ -376,18 +376,18 @@ wheels = [
 
 [[package]]
 name = "etoon"
-version = "0.7.1"
+version = "0.9.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "orjson" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/ff/53/9a15d6d279ec734e95ba8335d5b7ffd44531862038123e6982646db8614f/etoon-0.7.1.tar.gz", hash = "sha256:94ec21db0b734ef7522b31d927ee6c13218875a11b55e2af028cf5bcbd843e58", size = 57461, upload-time = "2026-08-01T01:04:17.751Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/95/36/48e3b462408e44e765765f8a90c7e9bf83664094cac8e1c02c718f8c3833/etoon-0.9.0.tar.gz", hash = "sha256:91c03de4e1bd6af4991b6e0236fb69279c56af015177431e776684c915b58ebe", size = 89217, upload-time = "2026-11-05T04:14:47.464Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/f9/f1/7b88da432be9a1407c89fb486ebabfd2b029c29c0290814fc481d810a773/etoon-0.7.1-cp313-cp313-macosx_10_12_x86_64.whl", hash = "sha256:e72ac861927bc941dfbdb11d799550bf06d8e48b62324e3c86ff8474a06e5314", size = 343201, upload-time = "2026-08-01T01:04:11.882Z" },
-    { url = "https://files.pythonhosted.org/packages/af/7b/2b77fedcdcd7d560b63219a6b79d6e6a73b94341708e5142ec6777c47702/etoon-0.7.1-cp313-cp313-macosx_11_0_arm64.whl", hash = "sha256:a8be5efd8a6c72200823d0b4accd8c9ef2b454f631fe61373a97b7aa1a31d56a", size = 317797, upload-time = "2026-08-01T01:04:13.079Z" },
-    { url = "https://files.pythonhosted.org/packages/65/66/150e66ebc3137f692b5d2cb06b0d9c0ddffa30f29c71ce283d527ac9b3c7/etoon-0.7.1-cp313-cp313-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:361f3844a0b2e28b425929666976059b3461905439b01ba2cc8a330a7222ed26", size = 325709, upload-time = "2026-08-01T01:04:14.467Z" },
-    { url = "https://files.pythonhosted.org/packages/bf/43/fad0e6f213fe2c3aaa854e1a5db4d2e1d767945e31cd1520a058c41eeb0b/etoon-0.7.1-cp313-cp313-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:50ff212649bba86fa4fdf20a7cf67facdf5373ab88f98b42571bb36af0246c22", size = 350311, upload-time = "2026-08-01T01:04:15.57Z" },
-    { url = "https://files.pythonhosted.org/packages/fa/1a/7537c6f1eef85228e1dd3fb416214d225ecdc6f4e81d0f1e3bb2a196789c/etoon-0.7.1-cp313-cp313-win_amd64.whl", hash = "sha256:1e9fb6d55f04b07abf68a5669972902afdf7b274b64aed41f879f13cf05772d0", size = 262237, upload-time = "2026-08-01T01:04:16.757Z" },
+    { url = "https://files.pythonhosted.org/packages/b9/a1/78f3dd3ababb4e7915a17c2afebafa6c5a043c2a9a65b2503ff206eebf34/etoon-0.9.0-cp313-cp313-macosx_10_12_x86_64.whl", hash = "sha256:a8087182e1ccf9a4e237b14de14dff650bfa3819940f07ebb3dc24b8918d36db", size = 347436, upload-time = "2026-11-05T04:14:42.175Z" },
+    { url = "https://files.pythonhosted.org/packages/63/a8/28c76a1264577707d8c543148576fa142de52f0818ed9d0489b2232f957a/etoon-0.9.0-cp313-cp313-macosx_11_0_arm64.whl", hash = "sha256:bcf13420cff6edc2d13ea528197aee69e4b46ed71c03ecc9d68b028e6576729a", size = 320876, upload-time = "2026-11-05T04:14:43.137Z" },
+    { url = "https://files.pythonhosted.org/packages/0e/c1/f7c0c46b00d67938a7fd465151291c8e83d9cd0fc5e02ce3b2c11bc9e6fa/etoon-0.9.0-cp313-cp313-manylinux2014_aarch64.manylinux_2_17_aarch64.whl", hash = "sha256:4262c30a0d6ca421224a7e3d41d55d3b5b5b2331924d075c8c556890624b7fac", size = 329096, upload-time = "2026-11-05T04:14:44.159Z" },
+    { url = "https://files.pythonhosted.org/packages/33/d5/57d1ba6d727f60b503d919f1ee2779c37a460439c5487612157d3e7b8d77/etoon-0.9.0-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:1a64f4bcb2c4a446eb45aa1810cccc7c9f9ecc7b71811fe6d04ac3c628083918", size = 355686, upload-time = "2026-11-05T04:14:45.252Z" },
+    { url = "https://files.pythonhosted.org/packages/9e/b9/71e28234e364965ecc20d836832f226d4e471540aa322bd4a83391fb0991/etoon-0.9.0-cp313-cp313-win_amd64.whl", hash = "sha256:bfcced800cd786748e86aac9185a6f3f4220a38c2eb0efd34a5d4e57aca162e8", size = 272116, upload-time = "2026-11-05T04:14:46.359Z" },
 ]
 
 [[package]]
